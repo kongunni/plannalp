@@ -1,0 +1,1245 @@
+
+
+/*
+=================================
+*/
+body {
+    height: 100vh;
+    overflow-y: auto; 
+    display: flex;
+    flex-direction: column;
+}
+
+/* 다크모드 */
+body.dark-mode  {
+    background-color: #1e1e1e;
+    color: #ddd;
+}
+
+body.dark-mode .navContainer {
+    background-color: #121212;
+}
+
+body.dark-mode .navLogo {
+    color: #fff;
+}
+
+body.dark-mode .menu {
+    background: #252525;
+    color: #ddd;
+}
+
+body.dark-mode .menuItem:hover {
+    background: #333;
+}
+
+body.dark-mode .toggleSwitch {
+    background: #444;
+}
+
+body.dark-mode .toggleSwitch.active {
+    background: #007bff;
+}
+
+body.dark-mode .fontSelector {
+    background: #222;
+}
+
+body.dark-mode .fontOption {
+    color: #bbb;
+}
+
+body.dark-mode .fontOption.active {
+    background: #444;
+    color: white;
+}
+
+body.dark-mode .calendarContainer {
+    background: #222;
+    color: #ddd;
+}
+
+body.dark-mode .fc-toolbar-title {
+    color: #ddd;
+}
+
+body.dark-mode .fc-daygrid-day {
+    border: 1px solid #444;
+}
+
+body.dark-mode .fc-event {
+    background: #007bff;
+}
+
+body.dark-mode .fc-event:hover {
+    background: #0056b3;
+}
+
+/* ✅ 모달 */
+body.dark-mode .modalContent {
+    background: #252525;
+    color: #ddd;
+}
+
+body.dark-mode .modalContent h2 {
+    color: #fff;
+}
+
+body.dark-mode .modalContent p {
+    color: #bbb;
+}
+
+body.dark-mode .createdAt {
+    color: #888;
+}
+
+body.dark-mode .buttonContainer button {
+    background: #444;
+    color: #fff;
+}
+
+body.dark-mode .buttonContainer button:hover {
+    background: #555;
+}
+
+/* 스케쥴폼*/
+body.dark-mode .scheduleContainer {
+    background-color: #121212;
+    color: white;
+}
+
+
+
+body.dark-mode .dark-mode-scheduleForm {
+    background: #252525 ;
+    color: white;
+}
+
+/* ✅ 입력 필드 */
+body.dark-mode .dark-mode-scheduleForm input,
+body.dark-mode .dark-mode-scheduleForm textarea {
+    background: #333;
+    border: 1px solid #444;
+    color: #ddd;
+}
+
+/* ✅ 버튼 */
+body.dark-mode .dark-mode-scheduleForm button {
+    background: #007bff;
+    color: white;
+}
+
+body.dark-mode .dark-mode-scheduleForm button:hover {
+    background: #0056b3;
+}
+
+
+
+body.dark-mode .dark-mode-scheduleList {
+    background-color: #1e1e1e;
+    color: white;
+}
+
+body.dark-mode .dark-mode-scheduleList h2 {
+    color: #ddd;
+}
+
+body.dark-mode .dark-mode-scheduleList ul {
+    color: #ddd;
+}
+
+body.dark-mode .dark-mode-scheduleList li {
+    background: #333;
+    border: 1px solid #444;
+    color: #ddd;
+}
+
+body.dark-mode .dark-mode-scheduleList strong {
+    color: #ddd;
+}
+
+/* 작은 텍스트*/
+body.small-text {
+    font-size: 12px;
+}
+
+body.small-text h1 {
+    font-size: 1.5rem;
+}
+
+body.small-text h2 {
+    font-size: 16px;
+}
+
+body.small-text .small-text-scheduleList strong {
+    font-size: 13px !important;
+}
+
+/* 패이지 잠금 활성화 */
+body.page-locked {
+    overflow: hidden; /* 🔥 스크롤 막기 */
+}
+
+body.page-locked fieldset {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.navContainer, .navbar {
+    pointer-events: auto !important;
+}
+
+
+/* .calendar-locked {
+    pointer-events: none; 클릭, 드래그 등 모든 인터랙션 차단
+    opacity: 0.6; 흐리게 처리하여 비활성화 느낌
+    user-select: none; 텍스트 선택 방지
+} */
+
+
+/* ✅ 전체 페이지 구조 */
+#page-wrapper {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+
+
+    position: relative;
+}
+
+/* 🔥 모달이 열릴 때 전체 화면 블러 효과 */
+#page-wrapper.modal-open .content-wrapper,
+#page-wrapper.modal-open #main-container {
+    filter: blur(10px);
+    backdrop-filter: blur(10px);
+    pointer-events: none;
+    transition: filter 0.3s ease-in-out;
+}
+
+#page-wrapper.modal-open .modalOverlay,
+#page-wrapper.modal-open .modalContent,
+#page-wrapper.modal-open .modalContainer {
+    filter: none !important;
+    backdrop-filter: none !important;
+    pointer-events: auto !important;
+    z-index: 10002; 
+    position: relative;
+}
+
+
+
+.navContainer {
+    width: 100%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+}
+
+.content-wrapper {
+    display: flex;
+    flex-grow: 1;
+    min-height: calc(100vh - 300px);  
+    justify-content: center;  
+    align-items: flex-start;
+}
+
+/* ✅ 메인 컨테이너 */
+#main-container {
+    min-height: 120vh;
+    display: flex;
+    justify-content: center;
+    flex-grow: 1;
+    max-width: 1000px;
+    width: 100%;
+    padding: 20px;
+    padding-top: 150px;
+    transition: transform 0.4s ease-in-out, width 0.4s ease-in-out;
+    margin: 0 auto;
+    margin-bottom: 150px;
+}
+
+/* ✅ 사이드바가 펼쳐졌을 때 */
+body.expanded #main-container {
+    max-width: calc(1000px - 240px);
+    transform: translateX(120px);
+}
+
+/* ✅ 사이드바가 접혔을 때 */
+body.collapsed #main-container {
+    max-width: 1000px;
+    width: calc(100% - 60px);
+    transform: translateX(0px);
+}
+
+/* ✅ 사이드바 컨테이너 */
+.sidebar-container {
+    display: flex;
+    flex-direction: column;
+    transition: width 0.4s ease-in-out;
+    z-index: 9999;
+    left: 0;
+    top: 0;
+    position: fixed;  
+    background-color: inherit;
+}
+
+/* 🔥 폼 블러 방지 */
+/* .modalContent input,
+.modalContent textarea,
+.modalContent select,
+.modalContent button {
+    filter: none !important;
+    backdrop-filter: none !important;
+    pointer-events: auto !important;
+    opacity: 1 !important;
+} */
+
+
+/* 사이드바가 펼쳐졌을 때 */
+.sidebar-container.expanded {
+    width: 240px;
+    height: 100vh;
+    transition: width 0.3s ease-in-out ;
+}
+
+/* ✅ 사이드바가 접혔을 때 */
+.sidebar-container.collapsed {
+    width: 60px;
+    height: 100vh;
+    overflow: hidden;  
+    transition: width 0.3s ease-in-out !important;
+}
+
+/* ✅ 접혔을 때 내부 콘텐츠 숨김 */
+.sidebar-container.collapsed .sidebar,
+.sidebar-container.collapsed .sidebar-content,
+.sidebar-container.collapsed .button-container {
+    display: none; /* ✅ 내부 내용 아예 숨김 */
+}
+
+/* ✅ 사이드바 내부 레이아웃 */
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    padding-top: 50px;
+    background: #f4f4f4;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+    transition: all 0.4s ease-in-out;
+}
+
+/* ✅ 토글 버튼 (항상 상단 고정) */
+.sidebar-header {
+    width: 100%;
+    height: 50px;
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: absolute;
+}
+
+/* ✅ 접혔을 때 펼침 버튼 보이기 */
+.sidebar-container.collapsed .expandButton {
+    display: flex;
+    width: 100%;
+    height: 50px;
+    font-size: 20px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+/* ✅ 펼쳐졌을 때 접기 버튼 보이기 */
+.sidebar-container.expanded .collapseButton {
+    display: flex;
+    justify-content: flex-end;
+    padding-right: 20px;
+    width: 100%;
+    height: 50px;
+    font-size: 20px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+
+}
+
+/* ✅ 버튼 컨테이너 */
+.button-container {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* 새페이지 추가 */
+.newPageInput {
+    display: flex;
+}
+
+
+/* ✅ 페이지 목록 */
+.sidebar-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    flex-grow: 1;
+    padding: 10px;
+    overflow-y: auto;
+    max-height: 585px;
+}
+
+/* 사이드바 페이지*/
+.pageItem {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    height: 10px;
+    cursor: pointer;
+    position: relative;
+    width: 100%;
+}
+
+.pageItem:hover {
+    background-color: rgba(211, 211, 211, 0.465);
+    border-radius: 10px;
+    width: 100%;
+}
+
+.pageTitle {
+    display: flex;
+    align-items: flex-start;
+    flex-grow: 1; 
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 14px;
+}
+
+.pageTitle input {
+    width: 160px;
+    height: 10px;
+    font-size: 14px;
+    padding: 3px 3px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+}
+
+.renameActions {
+    display: flex;
+    align-items: center;
+    float: left;
+}
+
+.confirmRenameBtn, .cancelRenameBtn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.confirmRenameBtn:hover {
+    color: rgb(212, 0, 0);
+}
+
+.cancelRenameBtn:hover {
+    color: red;
+}
+
+.pageActions {
+    display: flex;
+    align-items: flex-start;
+    gap: 5px;
+}
+
+/* 🔥 공통 스타일 */
+.pageActionButton {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.pageActionButton:hover {
+    opacity: 1;
+}
+
+/* 📌 설정 버튼 */
+.settingsButton {
+    color: #666;
+    font-size: 16px;
+}
+
+/* 📌 새 페이지 추가 버튼 */
+.addPageButton {
+    color: #000000;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+/* ✅ 페이지 설정창 */
+.pageSettings {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: white;
+    border: 1px solid #ccc;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    padding: 5px;
+    border-radius: 5px;
+    min-width: 150px;
+}
+
+
+/* ✅ 설정창 내부 버튼 스타일 */
+.settingsOption {
+    background: none;
+    border: none;
+    padding: 8px 12px;
+    cursor: pointer;
+    text-align: left;
+    font-size: 14px;
+    width: 100%;
+}
+
+.settingsOption:hover {
+    background: #f0f0f0;
+}
+/* 
+#fav-btn { color: #ffcc00; }
+#duplicate-btn { color: #009688; }
+#rename-btn { color: #007aff; }
+#delete-btn { color: #ff3b30; font-weight: bold; } */
+
+.pageIcon {
+    margin-right: 8px;
+    font-size: 16px;
+    color: #666;
+}
+
+.settingsIcon {
+    margin-right: 8px;
+    font-size: 14px;
+}
+
+
+/* 사이드바 휴지통*/
+.trash-container {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    color: red;
+    border-top: 1px solid #ddd;
+    /* margin-top: auto;  */
+    margin: 0;
+}
+
+.trash-container:hover {
+    background-color: rgba(211, 211, 211, 0.2);
+    border-radius: 5px;
+}
+
+/* ✅ 휴지통 모달 */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 400px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+    opacity: 0;
+    visibility: hidden;
+}
+
+
+
+.trash-modal {
+    background-color: #f4f4f4;
+    padding: 0 10px;
+    width: 400px;
+    height: 220px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    text-align: center;   
+    opacity: 0;
+    transform: scale(0.95);
+    transform: translateY(10px) scale(0.95); 
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+    display: flex;
+    flex-direction: column;
+
+    /* justify-content: space-between; */
+}
+
+.modal-overlay.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.modal-overlay.active .trash-modal {
+    opacity: 1;
+    transform: translateY(0px) scale(1);
+}
+
+.trash-list {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 200px;
+}
+
+.trash-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 5px 5px;
+    border-bottom: 1px solid #ddd;
+    height: 15px;
+    /* overflow-y: scroll; */
+}
+
+.trash-title {
+    font-size: 14px;
+}
+
+
+.trash-item-content{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px;
+    color: #999999;
+    /* height: 85%; */
+}
+
+.trash-button-container {
+    display: flex;
+    flex-direction: row;
+    width: 14%;
+}
+
+.trash-item-button {
+    gap:5px;
+}
+
+.trash-item-button:hover {
+    color: rgba(194, 17, 17, 0.465);
+}
+
+
+.trash-footer {
+    display: flex;
+    justify-content: flex-start;
+    height: 10px;
+    margin: 0;
+    padding: 0;
+}
+
+.trash-footer h5 {
+    font-weight: 100;
+    font-size: 12px;
+    margin: 0;
+    padding: 0;
+}
+
+/*
+============================================================
+*/
+
+/* [FULLCALENDAR] 
+Css 커스터마이징 하기 위해서는 :root로 설정된 내용을 변경하고 덮어씌워야 됨.
+전역으로 설정되었기 때문에 global.css에서 사용.
+*/
+
+:root {
+    /* 기본 스타일 */
+    --fc-font-family: "Inter", sans-serif;
+    --fc-small-font-size: 0.9em;
+    --fc-page-bg-color: #ffffff;
+    --fc-border-color: #e0e0e0;
+
+    /* 버튼 스타일 */
+    --fc-button-bg-color: #f5f5f5;
+    --fc-button-border-color: #e0e0e0;
+    --fc-button-text-color: #333;
+    --fc-button-hover-bg-color: #f6f6f6bb;
+    --fc-button-hover-border-color: transparent;
+    --fc-button-active-bg-color: #d6d6d6;
+    --fc-button-active-border-color: transparent;
+    --fc-prev-next-button-hover-bg: transparent;
+
+    /* 이벤트 스타일 */
+    --fc-event-bg-color: rgb(255, 255, 255);
+    --fc-event-border-color: #ddd;
+    --fc-event-text-color: rgb(0, 0, 0);
+    --fc-event-selected-overlay-color: rgba(23, 22, 22, 0.1);
+
+    /* 기타 */
+    --fc-today-bg-color: rgba(171, 171, 171, 0.305);
+    --fc-now-indicator-color: #ff5555;
+}
+
+
+/* FullCalendar 전체적인 스타일 */
+.fc {
+    font-family: var(--fc-font-family);
+    font-size: var(--fc-small-font-size);
+}
+
+/* 버튼 스타일 - 둥글고 깔끔한 UI */
+.fc .fc-button {
+    border: none !important;
+}
+
+.fc .fc-button:hover {
+    border: none !important;
+}
+
+.fc .fc-button-active {
+    border: none !important;
+}
+
+/* 일정 이벤트 스타일 - 노션 스타일의 미니멀한 카드형 */
+.fc .fc-daygrid-event {
+    display: block !important;
+    background: var(--fc-event-bg-color) !important;
+    border-radius: 6px !important;
+    padding: 0px 10px !important;
+    color: var(--fc-event-text-color) !important;
+    font-weight: 500 !important;
+    box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.05) !important;
+    border: 1px solid var(--fc-event-border-color) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    max-width: 100% !important;
+}
+
+/* 일정 이벤트 내부 텍스트 스타일 */
+.fc .fc-daygrid-event .fc-event-title {
+    font-size: 0.9em !important;
+    font-weight: 400 !important;
+}
+
+.fc .fc-daygrid-event a {
+    min-width: 0 !important;
+}
+
+
+.fc-event-dragging {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+}
+
+
+/* 🔥 일정 제목 스타일 */
+.fc-event-title {
+    /* flex: 1; */
+    text-align: center;
+}
+
+/* 오늘 날짜 배경 강조 */
+.fc .fc-day-today {
+    background-color: var(--fc-today-bg-color) !important;
+    border-radius: 6px !important;
+}
+
+/* 캘린더 테이블 스타일 */
+.fc .fc-daygrid-day {
+    padding: 8px !important;
+    border: 1px solid var(--fc-border-color) !important;
+    transition: background-color 0.2s ease-in-out;
+}
+
+.fc .fc-daygrid-day:hover {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* 이벤트 내부 박스 크기 조절 */
+.fc-daygrid-event > div {
+    display: block !important;
+    padding: 4px 0px !important;  
+    max-width: 100% !important; 
+}
+
+/* 캘린더 헤더 스타일 */
+.fc .fc-toolbar-title {
+    font-size: 2em !important;
+    font-weight: 100 !important;
+}
+
+/* 시간 표시 바 */
+.fc-timegrid-axis {
+    font-size: 0.85em !important;
+    color: #666 !important;
+}
+
+
+
+/* Previous & Next 버튼을 미니멀한 아이콘 스타일로 변경 */
+.fc-prev-button, .fc-next-button {
+    background: transparent !important; 
+    border: none !important;  
+    box-shadow: none !important;
+    width: 36px !important; 
+    height: 36px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: background 0.2s ease-in-out;
+    border-radius: 6px !important;
+}
+
+/* 버튼 내부 아이콘 스타일 조정 */
+.fc-prev-button::before, .fc-next-button::before {
+    font-size: 1.2em !important;
+    font-weight: bold !important;
+    color: #333 !important;
+}
+
+
+
+/*
+============================================================
+*/
+
+/* 노션 블럭 */
+/* 전체 블록 영역 */
+.block-container {
+    padding: 40px;
+    max-width: 720px;
+    margin: 0 auto;
+    overflow-y: auto;
+    max-height: none; 
+    padding: 0;
+    width: 100%;
+    min-height: 80vh;
+    z-index: 0; /* callout때문에 추가*/
+  }
+  
+  /* 개별 블록 */
+  .block {
+    position: relative;
+    margin-bottom: 8px;
+    padding-left: 48px;
+  }
+  
+  /* 블록 핸들러 */
+  .block-handle {
+    display: flex;
+    position: absolute;
+    align-items: center;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    gap: 4px;
+    z-index: 5;
+    min-width: 28px;
+    justify-content: flex-start;
+  }
+
+  .drag-handle {
+    cursor: grab;
+    font-size: 16px;
+    color: #999;
+    user-select: none;
+    -webkit-user-drag: none;
+    touch-action: none;
+  }
+  
+  .add-block {
+    cursor: pointer;
+    font-size: 20px;
+    color: #555;
+  }
+
+  .block-content {
+    font-size: 16px;
+    line-height: 1.8;
+    word-break: break-word;
+    white-space: pre-wrap;
+    color: #37352f;
+  }
+  
+  /* 입력 영역 */
+  .block-input {
+    position: relative;
+    margin-top: 20px;
+  }
+  
+  /* 초기 안내 문구 (placeholder) */
+  .editable-placeholder {
+    color: #a6a6a6;
+    cursor: text;
+    font-size: 16px;
+    line-height: 1.8;
+}
+
+  .editable-wrapper {
+    position: relative;
+  }
+  
+  /* contentEditable 입력창 */
+  .editable {
+    min-height: 24px;
+    padding: 4px 2px;
+    font-size: 16px;
+    outline: none;
+    border: none;
+    caret-color: #2e2e2e;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .blockPlaceholder {
+    position: absolute;
+    top: 10px;
+    left: 4px;
+    color: #a6a6a6;
+    pointer-events: none;
+    font-style: italic;
+    font-size: 12px;
+  }
+
+  
+
+  
+  /* 드롭다운 목록 */
+  .commandDropdown {
+    margin-top: 0;
+    border: 1px solid #ddd;
+    background-color: white;
+    border-radius: 4px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    width: 300px;
+    /* position: absolute; 
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    border: 1px solid #ddd;
+    background-color: white;
+    border-radius: 4px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+    z-index: 1000;
+    width: 300px; */
+  }
+  
+  /* 드롭다운 항목 */
+  .commandItem {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .commandItem.selected,
+  .commandItem:hover {
+    background-color: #f2f2f2;
+    color: #000;
+  }
+
+  
+/*****************************
+ * 노션기능  
+ *****************************/
+/* 제목1~3 */
+.block-title1 { font-size: 32px; font-weight: bold; }
+.block-title2 { font-size: 24px; font-weight: bold; }
+.block-title3 { font-size: 20px; font-weight: bold; }
+
+/* 구분선 */
+.block-divider {
+    width: 100%;
+    height: 0.5px;
+    min-height: 0.5px;
+    max-height: 0.5px;
+    background-color: #ccc;
+    margin: 12px 0;
+    padding: 0;
+    pointer-events: none;
+}
+
+/* ==============================
+   체크리스트
+   (BlockEditor에서 wrapper에 block-checklist 클래스가 들어감)
+============================== */
+
+/* 블록 래퍼를 체크리스트 레이아웃로 */
+.block-checklist {
+  display: block;  /* wrapper는 블록 */
+}
+
+/* 여러 체크리스트 블록을 위아래로 모아 보일 때 그룹간 여백 */
+.checklist-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 2px;
+}
+
+/* 개별 항목 컨테이너 (label) */
+.checklist-item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;               /* 체크박스-텍스트 간격 */
+  padding: 2px 4px;
+  border-radius: 6px;
+  transition: background-color .15s ease;
+}
+
+.checklist-item:hover,
+.checklist-item:focus-within {
+  background-color: #f5f5f5;
+}
+
+/* 체크박스 */
+.checklist-item input[type="checkbox"] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 3px 0 0 0;
+  accent-color: #4f46e5;
+  cursor: pointer;
+}
+
+/* 체크리스트 텍스트(편집 영역) */
+.checklist-item .editable {
+  flex: 1 1 auto;
+  min-height: 22px;
+  padding: 2px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  outline: none;
+  border: none;
+  caret-color: #2e2e2e;
+  font-size: 16px;
+}
+
+/* 체크 완료 스타일 */
+.checklist-text.checked {
+  text-decoration: line-through;
+  color: #a3a3a3;
+}
+
+/* ==============================
+   드래그 인디케이터(노션식 파란 밑줄)
+============================== */
+.drop-indicator {
+  height: 2px;
+  background: #3b82f6;      /* 파랑 */
+  margin: 2px 0;
+  border-radius: 1px;
+}
+
+/*  드래그 중 살짝 투명 효과 */
+.block.dragging { opacity: .85; }
+
+
+/* ==============================
+   콜아웃
+============================== */
+
+/* 외곽 래퍼: 기본 여백만, 배경/테두리는 내부 박스에서 처리 */
+.editable-wrapper.block-callout {
+  position: relative;
+  margin: 8px 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+/* 실제 콜아웃 박스 */
+.editable-wrapper.block-callout .block-callout {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid #e5e7eb;
+  background: #fffbe6;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+/* 내부 레이아웃 */
+.editable-wrapper.block-callout .callout-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+
+/* === 콜아웃 메뉴 트리거 (…) === */
+.callout-menu-trigger {
+  position: absolute;
+  top: 8px; right: 8px;
+  width: 26px; height: 26px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  opacity: 0; /* hover 시만 노출 */
+  transition: opacity .15s ease;
+}
+.block-callout:hover .callout-menu-trigger,
+.block-callout:focus-within .callout-menu-trigger { opacity: 1; }
+
+
+/* === 메뉴 공통 === */
+.callout-menu, .callout-icon-pop {
+  z-index: 9999;
+  min-width: 240px;
+  padding: 8px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+}
+
+.co-sec { margin: 6px 0; }
+.co-sec-title { font-size: 12px; color:#6b7280; margin: 4px 2px 6px; }
+.co-grid { display: grid; grid-template-columns: repeat(5, 28px); gap: 8px; }
+.co-empty { font-size: 12px; color:#9ca3af; padding: 6px 2px; }
+
+/* === 동그라미 스와치 === */
+.co-swatch {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid #e5e7eb; cursor: pointer;
+}
+
+/* ===== 텍스트 모드 ===== */
+.block-callout.callout--text { background: #ffffff; }
+.block-callout.callout--text .editable[data-type="callout"] { color:#111827; } /* default */
+.block-callout.callout--text.callout--gray   .editable[data-type="callout"] { color:#374151; }
+.block-callout.callout--text.callout--brown  .editable[data-type="callout"] { color:#8b5e3c; }
+.block-callout.callout--text.callout--orange .editable[data-type="callout"] { color:#c2410c; }
+.block-callout.callout--text.callout--yellow .editable[data-type="callout"] { color:#b45309; }
+.block-callout.callout--text.callout--green  .editable[data-type="callout"] { color:#15803d; }
+.block-callout.callout--text.callout--blue   .editable[data-type="callout"] { color:#1d4ed8; }
+.block-callout.callout--text.callout--purple .editable[data-type="callout"] { color:#6d28d9; }
+.block-callout.callout--text.callout--pink   .editable[data-type="callout"] { color:#be185d; }
+.block-callout.callout--text.callout--red    .editable[data-type="callout"] { color:#b91c1c; }
+
+
+/* 배경 모드: 컬러 베이스에 낮은 알파(투명감) */
+/* 박스 배경 */
+.block-callout.callout--bg               { background: rgba(17,24,39,0.06); }   /* default */
+.block-callout.callout--bg.callout--gray    { background: rgba(55,65,81,0.08); }
+.block-callout.callout--bg.callout--brown   { background: rgba(139,94,60,0.10); }
+.block-callout.callout--bg.callout--orange  { background: rgba(194,65,12,0.10); }
+.block-callout.callout--bg.callout--yellow  { background: rgba(180,83,9,0.12); }
+.block-callout.callout--bg.callout--green   { background: rgba(21,128,61,0.10); }
+.block-callout.callout--bg.callout--blue    { background: rgba(29,78,216,0.10); }
+.block-callout.callout--bg.callout--purple  { background: rgba(109,40,217,0.10); }
+.block-callout.callout--bg.callout--pink    { background: rgba(190,24,93,0.10); }
+.block-callout.callout--bg.callout--red     { background: rgba(185,28,28,0.10); }
+
+/* 배경 모드의 텍스트 컬러(눈 편한 다크) */
+.block-callout.callout--bg .editable[data-type="callout"] { color:#111827; }
+/* 아이콘 피커 */
+.co-icon-grid { display: grid; grid-template-columns: repeat(5, 32px); gap: 8px; }
+.co-icon-btn {
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 1px solid #e5e7eb; background: #fff; cursor: pointer;
+  font-size: 18px; line-height: 32px;
+}
+.co-icon-btn:hover { background:#f9fafb; border-color:#cbd5e1; }
+
+
+/* 아이콘 */
+.editable-wrapper.block-callout .callout-icon {
+  flex: 0 0 auto; width: 1.25em; text-align: center;
+  margin-top: 2px; line-height: 1; user-select: none; opacity: .95;
+}
+
+/* 텍스트 영역 */
+.editable-wrapper.block-callout .editable[data-type="callout"] {
+  flex: 1 1 auto;
+  min-height: 1.25rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  outline: none;
+}
+
+/* 비어있을 때 플레이스홀더 (포커스 아닐 때만) */
+.editable-wrapper.block-callout .editable[data-type="callout"]:not(:focus):empty::before {
+  content: "메모를 입력하세요…";
+  color: #9ca3af;              
+}
+
+/* 포커스 시 테두리 강조 (지원 브라우저에서만 :has 적용) */
+@supports selector(:has(*)) {
+  .editable-wrapper.block-callout .block-callout:has(.editable[data-type="callout"]:focus) {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+  }
+}
+
+/* 호버 시 살짝 강조 (포커스 보조 효과) */
+.editable-wrapper.block-callout .block-callout:hover {
+  border-color: #f5d37a;
+}
+
+/* 주변 블록과의 간격 정리 (취향에 맞게 조절) */
+.block + .editable-wrapper.block-callout,
+.editable-wrapper.block-callout + .block {
+  margin-top: 8px;
+}
+
+
+
+/* ==============================
+  
+============================== */
+
+
+/* 푸터 */
+.footer-container {
+    width: 100%;
+    height: 300px;
+    background-color: black;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+
+/* 푸터 스타일 */
+.footer-container {
+    width: 100%;
+    height: 300px;
+    background-color: black;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    position: relative;
+}
+  .footer-section {
+    font-size: 14px;
+  }
+
+
+

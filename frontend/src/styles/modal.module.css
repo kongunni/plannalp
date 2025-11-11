@@ -1,0 +1,245 @@
+/* 🔥 모달 전체 배경 */
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10002;
+}
+
+/* 🔥 모달 컨텐츠 (카드형) */
+.modalContent {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.15);
+    width: 90%;
+    max-width: 500px;
+    height: auto;
+    position: relative;
+    animation: fadeIn 0.3s ease-in-out;
+    font-family: "Inter", sans-serif;
+    z-index: 10003;
+}
+
+/* ✅ 다크모드 적용 */
+.dark-mode {
+    background: #252525 !important;
+    color: #ddd;
+}
+
+.dark-mode input,
+.dark-mode textarea {
+    background: #333;
+    border: 1px solid #444;
+    color: #ddd;
+}
+
+/* 잠금 */
+.modalContent.locked {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+
+
+
+/* 🔥 닫기 버튼 */
+.modalButtonContainer {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.closeButton {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    border: none;
+    background: transparent;
+    font-size: 18px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: 0.2s;
+}
+
+.closeButton:hover {
+    opacity: 1;
+}
+
+/* ✅ 모달 헤더 */
+.modalHeader {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 12px;
+    color: #222;
+    text-align: center;
+}
+
+.modalContent form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* 🔥 입력 필드 */
+.modalContent input,
+.modalContent textarea {
+    width: 100%;
+    padding: 10px;
+    font-size: 14px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #f8f8f8;
+    transition: 0.3s;
+}
+
+.modalContent input:focus,
+.modalContent textarea:focus {
+    border-color: red;
+    outline: none;
+}
+
+/* ✅ 버튼 스타일 */
+.buttonContainer {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 18px;
+}
+
+/* 🔥 버튼 공통 */
+.buttonContainer button {
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: bold;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: 0.2s;
+    border: none;
+}
+
+/* 🔥 저장/수정 버튼 */
+.saveButton, .editButton {
+    background: #df0606;
+    color: white;
+}
+
+.saveButton:hover, .editButton:hover {
+    background: #c0392b;
+}
+
+/* 🔥 취소 버튼 */
+.cancelButton {
+    background: #ccc;
+    color: black;
+}
+
+.cancelButton:hover {
+    background: #bbb;
+}
+
+/* 🔥 삭제 버튼 */
+.deleteButton {
+    background: #e74c3c;
+    color: white;
+}
+
+.deleteButton:hover {
+    background: #c0392b;
+}
+
+/* 🔥 토글 스위치 */
+.toggleSwitch {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    margin-top: 8px;
+}
+
+/* 🔥 토글 슬라이더 */
+.toggleSlider {
+    position: relative;
+    width: 40px;
+    height: 20px;
+    background: #ccc;
+    border-radius: 50px;
+    transition: background 0.3s ease;
+}
+
+.toggleSlider::before {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.3s ease;
+}
+
+.toggleSwitch.active .toggleSlider {
+    background: #df0606; 
+}
+
+.toggleSwitch.active .toggleSlider::before {
+    transform: translateX(20px);
+}
+
+/* ✅ 상세 페이지 내용 */
+.contentWrapper {
+    padding: 10px 0;
+}
+
+.contentWrapper p {
+    margin: 8px 0;
+    font-size: 14px;
+    color: #444;
+}
+
+/* 🔥 작성일 스타일 */
+.createdAt {
+    font-size: 12px;
+    color: #888;
+    margin-top: 12px;
+}
+
+/* 🔥 애니메이션 */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 🔥 페이지 잠금 시 */
+.modalContent.locked {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+/* 🔥 색상 선택 */
+.colorPicker {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.colorPicker input {
+    width: 40px;
+    height: 30px;
+    border: none;
+    cursor: pointer;
+}

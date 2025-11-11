@@ -1,0 +1,229 @@
+button {
+    display: flex;
+    background: none;
+    border: none;
+}
+
+/* 로그인 페이지 전체 레이아웃 */
+.loginWrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: white;
+    min-height: calc(100vh - 150px);
+    padding-top: 150px;
+}
+
+/* 로그인 컨테이너 */
+.loginContainer {
+    width: 400px;
+    padding: 40px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+
+
+/* 로그인 폼 */
+.loginForm {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* 입력 필드 */
+.inputWrapper {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.inputField {
+    /* width: 100%; */
+    width: 340px;
+    padding: 12px 0;
+    margin: 5px 0;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: border-color 0.3s;
+    text-indent: 10px;
+}
+
+.inputField:focus {
+    border-color: red;
+    outline: none;
+}
+
+
+/* 버튼 스타일 공통 */
+.buttonWrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.buttonWrapper button {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    border: none;
+}
+
+.headerWrapper {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    margin: 0;
+    padding: 0;
+    width: 85%;
+    height: 150px;
+}
+
+.loginTitle{
+    font-size: 24px;
+    font-weight: 600;
+    padding: 0;
+    margin: 0;
+}
+
+.loginLogo{
+    font-weight: 400;
+    font-size: 26px;
+    padding: 0;
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: rgba(70, 68, 64, 0.45);
+}
+
+
+
+.forgotBtn {
+    font-size: 10px;
+    cursor: pointer;
+    justify-content: flex-end;
+    padding: 0 !important;
+    font-weight: 300 !important;
+    margin-right: 60px;
+    margin-top: -10px;
+}
+
+.forgotBtn:hover {
+    color: rgba(42, 42, 42, 0.45);
+}
+
+.loginBtn {
+    border-radius: 5px;
+    height: 50px;
+    justify-content: center;
+    width: 335px !important;
+    background: black;
+    color: white;
+}
+
+.kakaoLoginBtn {
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+    width: 200px;
+    height: 50px;
+    border: none;
+    background-color: transparent;
+    cursor: pointer;
+}
+
+.line {
+    margin: 20px 0;
+    width: 340px;
+    border-bottom: 1px solid rgba(70, 68, 64, 0.45);
+}
+
+.registerBtn {
+    justify-content: center;
+}
+
+.kakaoRegisterBtn {
+    justify-content: center;
+}
+
+/* 오류 메시지 */
+.errorMessage {
+    color: red;
+    font-size: 14px;
+    margin-top: 10px;
+}
+
+
+
+
+.modalOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modalContent {
+    background: white;
+    padding: 25px;
+    width: 400px;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.modalTitle {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.modalDescription {
+    font-size: 14px;
+    color: gray;
+}
+.modalButton {
+    background: blue;
+    color: white;
+}
+
+.modalButton:hover {
+    background: darkblue;
+}
+
+.modalClose {
+    background: red;
+    color: white;
+}
+
+.modalClose:hover {
+    background: black;
+}
+
+@media (max-width: 500px) {
+    .loginContainer, .modalContent {
+        width: 90%;
+    }
+}

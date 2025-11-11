@@ -1,0 +1,34 @@
+/* 🎨 태그 색상 선택 UI  */
+.colorPicker {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.colorPicker label {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.filterContainer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-top: 50px;
+}
+
+
+.filterContainer label{
+    font-size: 12px;
+}
+
+.filterContainer select {
+    padding: 5px 0px;
+    font-size: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3sease;
+}

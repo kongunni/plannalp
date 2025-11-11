@@ -1,0 +1,70 @@
+/* 회원가입 페이지 전체 레이아웃 */
+.registerWrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 150px);
+    padding-top: 150px;
+    background-color: white;
+}
+
+/* 회원가입 컨테이너 */
+.registerContainer {
+    width: 400px;
+    padding: 40px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+/* 회원가입 타이틀 */
+.registerTitle {
+    font-size: 24px;
+    font-weight: 700;
+    color: black;
+    margin-bottom: 20px;
+}
+
+/* 입력 필드 */
+.inputField {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+    transition: border-color 0.3s;
+}
+
+.inputField:focus {
+    border-color: red;
+    outline: none;
+}
+
+/* 회원가입 버튼 */
+.registerButton {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    font-weight: bold;
+    background: red;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.registerButton:hover {
+    background: black;
+}
+
+/* 오류 메시지 */
+.errorMessage {
+    color: red;
+    font-size: 14px;
+    margin-top: 10px;
+}

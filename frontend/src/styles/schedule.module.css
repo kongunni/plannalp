@@ -1,0 +1,575 @@
+/* 스케쥴 기본 페이지 */
+/* 🔥 컨테이너 스타일 */
+.container {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    margin: 20px auto;
+}
+
+/**/
+.headerContainer {
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-end;
+    width: 100%;
+    height: 150px;
+    margin-bottom: 20px;
+}
+
+/* 
+.headerContainer h1 {
+    
+} */
+/* 
+.inputContainer {
+    display: flex;
+    justify-content: flex-start;
+    width: 100%;
+    min-height: 50vh;
+    flex-direction: column;
+}
+
+🔥 명령어 입력창
+.pageInput {
+    width: 96%;
+    height: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: none;
+    resize: none;
+    outline: none;
+}
+
+🔥 명령어 목록 (드롭다운)
+.commandDropdown {
+    position: absolute;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+    width: 200px;
+    margin-top: 5px;
+    padding: 5px;
+    z-index: 100;
+}
+
+.commandItem {
+    padding: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    border-radius: 3px;
+    transition: background 0.2s;
+}
+
+.commandItem:hover, .selected {
+    background: #f0f0f0;
+}
+
+🔥 페이지명 입력창
+.pageTitleInput {
+    width: 100%;
+    padding: 8px;
+    font-size: 24px;
+    border: none;
+    outline: none;
+    color: black;
+    font-weight: normal;
+}
+
+.pageTitleInput::placeholder {
+    color: #bbb;
+    font-style: italic;
+}
+
+🔥 블록 리스트
+.blocksContainer {
+    margin-top: 20px;
+}
+
+.block {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-bottom: 5px;
+    background: #fafafa;
+}
+
+.block h2 {
+    margin: 0;
+    font-size: 18px;
+}
+
+🔥 페이지 리스트
+.pageListContainer {
+    margin-top: 20px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    background: #f9f9f9;
+    overflow-y: auto;
+    max-height: 200px;
+}
+
+.pageItem {
+    padding: 8px;
+    border-bottom: 1px solid #ddd;
+    cursor: pointer;
+    margin: 0 0 5px 0;
+}
+
+.pageItem:last-child {
+    border-bottom: none;
+}
+
+
+
+
+
+ */
+
+
+
+
+/* 🔥 일정 관리 페이지 컨테이너 */
+.scheduleContainer {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start; /* 🔥 상단 정렬 */
+    align-items: center;
+    width: 100%;
+    padding: 20px;
+    transition: transform 0.4s ease-in-out;
+}
+.schedulePage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background-color: #f8f9fa;
+    min-height: 100vh;
+    width: 100%;
+}
+
+
+.scheduleList {
+    width: 100%;
+    min-width: 500px;
+    max-width: 500px;
+    min-height: 300px;
+    max-height: 700px;
+    margin-top: 20px;
+    padding: 20px;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transform: transform 0.4 ease-in-out;
+}
+
+.scheduleList.expanded {
+    transform:  translateX(240px);
+}
+
+.filterContainer {
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 2px;
+}
+
+.filterContainer label {
+    font-size: 12px;
+  
+}
+
+.filterContainer select{
+    width: 60px;
+    font-size: 12px;
+    text-align: flex-start;
+    padding: 2px 0px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3sease;
+}
+
+.filterContainer option {
+    background-color: black;
+}
+
+
+
+.scheduleList h2 {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+
+.scheduleListContainer {
+    display: flex;
+    justify-content: center;    
+}
+
+.scheduleListWrapper {
+    display: flex;
+    width: 100%;
+    max-width: 400px;
+    height: 100%;
+    min-height: 195px;
+    align-items: center;
+}
+
+.scheduleListWrapper .emptyMessage {
+    align-items: center;
+    font-size: 14px;
+    color: #575757;
+}
+/* .scheduleList ul { */
+.scheduleListWrapper ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex-grow: 1; 
+}
+
+/* .scheduleList li { */
+
+.scheduleListWrapper li {
+    background: #ffffff;
+    border: 1px solid #ddd;
+    padding: 12px;
+    margin: 8px 0;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 60px;
+    transition: 0.3s ease-in-out;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+}
+
+.scheduleListWrapper li:hover {
+    background-color: #f1f1f1;
+}
+
+.scheduleListWrapper strong {
+    font-size: 32px;
+    color: #333;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/*  종료일 토글  */
+.toggleSwitch {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    width: 100%;
+    gap: 10px;
+    cursor: pointer;
+    user-select: none;
+    margin-top: 8px;
+}
+
+.toggleSlider {
+    position: relative;
+    width: 40px;
+    height: 20px;
+    background: #ccc;
+    border-radius: 50px;
+    transition: background 0.3s ease;
+}
+
+.toggleSlider::before {
+    content: "";
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.3s ease;
+}
+
+.toggleSwitch.active .toggleSlider {
+    background: #df0606; 
+}
+
+.toggleSwitch.active .toggleSlider::before {
+    transform: translateX(20px);
+}
+
+/* 필터: 리스트, 달력보기 */
+/* 🔥 필터 드롭다운 스타일 */
+.viewFilter {
+    max-width: 500px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin: 5px 0;
+    gap: 10px;
+}
+
+.viewFilter label {
+    font-size: 12px;
+    color: #333;
+}
+
+.viewFilter select {
+    padding: 5px 0px;
+    font-size: 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.viewFilter select:hover {
+    border-color: red;
+}
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: auto;  /* 🔥 항상 하단에 고정 */
+    padding: 10px;
+    width: 100%;
+}
+
+.pagination button {
+    padding: 8px 12px;
+    margin: 0 5px;
+    font-size: 14px;
+    font-weight: bold;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    background: white;
+    border: 1px solid #ddd;
+    transition: 0.3s;
+}
+
+.pagination button:hover {
+    background: red;
+    color: white;
+}
+
+/* 🔥 활성화된 페이지 스타일 */
+.pagination .activePage {
+    background: red;
+    color: white;
+    border-color: red;
+}
+
+.pagination button:disabled {
+    background: #ddd;
+    cursor: not-allowed;
+}
+
+fieldset[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+fieldset{   
+    border: none;
+}
+
+
+.toolbarContainer {
+    display: flex;
+    flex-direction: row;
+}
+
+/* 일정 추가 버튼 */
+.buttonContainer {
+    display: flex;
+    width: 100%;
+    justify-content: flex-start;
+    align-items: center;
+}
+.addButton {
+    width: 70px;
+    height: 30px;
+    font-size: 12px;
+    justify-content: center;
+    align-items: center;
+    padding: 5px 5px;
+    cursor: pointer;
+    background: black;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    transition: background 0.3s;
+}
+
+.addButton:hover {
+    background: #3c3c3c;
+}
+
+
+/* 
+* 스케쥴 상세 페이지 
+*/
+/* 🔹 전체 제목 컨테이너 */
+.scheduleTitleContainer {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    width: 100%;
+    min-height: 70px;
+    height: 70px;
+    margin: 0;
+    padding: 0;
+}
+
+/* 🔹 제목과 입력창을 포함하는 영역 */
+.scheduleTitleWrapper {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    height: 40px;
+}
+
+.titleSection {
+    width: 100%;
+    min-height: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    border-bottom: 2px solid transparent;
+}
+
+/* 🔹 제목 스타일 */
+.titleSection h1 {
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: color 0.2s ease-in-out;
+    text-align: left;
+    white-space: nowrap;
+    width: 100%;
+    min-height: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+}
+
+/* 🔹 제목 수정 입력창 */
+.titleSection input {
+    width: 100%;
+    font-size: 24px;
+    font-weight: bold;
+    border: none;
+    outline: none;
+    background: transparent;
+    text-align: left;
+    min-height: 50px;
+    height: 50px;
+    padding: 0 0 px;
+    border-bottom: 2px solid transparent; 
+    transition: border-bottom 0.2s ease-in-out;
+}
+
+.titleSection input:focus {
+    border-bottom: 1px solid #aaa;
+    color: #adadad;
+    padding: 0;
+}
+
+.scheduleTitleInput::placeholder {
+    color: #aaa;
+    font-style: italic;
+    font-size: 20px;
+}
+
+.scheduleTitleInput:focus {
+    border-bottom: 2px solid #aaa;
+}
+
+/* 🔹 안내 문구 스타일 */
+.guideContainer {
+    display: flex;
+    width: 100%;
+    height: 20px;
+    justify-content: flex-start;
+    margin-top: 5px;
+}
+
+.guideContainer h5 {
+    font-size: 12px;
+    font-style: italic;
+    font-weight: 100;
+    color: #575757;
+
+    margin: 0;
+    padding: 0;
+}
+
+
+/*
+* 콜아웃
+*/
+
+/* 🔥 콜아웃 입력 영역 */
+.calloutContainer {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+/* 🔥 콜아웃 입력창 스타일 */
+.calloutInput {
+    width: 100%;
+    min-height: 60px;
+    padding: 8px;
+    font-size: 14px;
+    border: none;
+    border-radius: 8px;
+    outline: none;
+    resize: none;
+    background-color: #f9f9f9;
+    transition: border-color 0.2s ease-in-out;
+    max-width: 540px;
+    min-width: 540px;
+}
+
+.calloutInput:focus {
+    border-color: red;
+    background-color: white;
+}
+
+
+/* 태그 */
+.scheduleTag {
+    display: flex;
+    width: 100%;
+    justify-content: center;
+}
+
+.tagBadge {
+    width: 100%;
+    max-width: 140px;
+    text-align: center;
+}

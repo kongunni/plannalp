@@ -1,0 +1,27 @@
+# 공통적으로 제외할 파일
+.DS_Store
+.vscode/
+.idea/
+
+# Node.js 관련 폴더 및 파일 (백엔드 & 프론트엔드 공통)
+**/node_modules/
+**/npm-debug.log
+**/yarn.lock
+**/package-lock.json
+
+# 환경 변수 파일 (백엔드 & 프론트엔드 공통)
+**/.env
+
+# 빌드된 파일 제외
+**/dist/
+**/out/
+**/.next/
+
+# 로그 및 캐시 파일 제외
+**/logs/
+**/tmp/
+**/.cache/
+
+
+backend/models/
+frontend/src/old_code/
