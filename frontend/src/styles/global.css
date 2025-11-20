@@ -1060,7 +1060,16 @@ Css 커스터마이징 하기 위해서는 :root로 설정된 내용을 변경�
    콜아웃
 ============================== */
 
-/* 외곽 래퍼: 기본 여백만, 배경/테두리는 내부 박스에서 처리 */
+/* 콜아웃 에디터 영역 (줄바꿈) */
+editable-wrapper.block-callout .editable[data-type="callout"] {
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 1.25rem;
+  outline: none;
+}
+
+
+/* 콜아웃 레이아웃  */
 .editable-wrapper.block-callout {
   position: relative;
   margin: 8px 0;
@@ -1086,10 +1095,9 @@ Css 커스터마이징 하기 위해서는 :root로 설정된 내용을 변경�
   align-items: flex-start;
 }
 
-
 /* === 콜아웃 메뉴 트리거 (…) === */
 .callout-menu-trigger {
-  position: absolute;
+ position: absolute;
   top: 8px; right: 8px;
   width: 26px; height: 26px;
   border: 1px solid #e5e7eb;
@@ -1097,9 +1105,10 @@ Css 커스터마이징 하기 위해서는 :root로 설정된 내용을 변경�
   background: #fff;
   cursor: pointer;
   font-weight: 700;
-  opacity: 0; /* hover 시만 노출 */
+  opacity: 0;
   transition: opacity .15s ease;
 }
+
 .block-callout:hover .callout-menu-trigger,
 .block-callout:focus-within .callout-menu-trigger { opacity: 1; }
 
@@ -1122,39 +1131,42 @@ Css 커스터마이징 하기 위해서는 :root로 설정된 내용을 변경�
 
 /* === 동그라미 스와치 === */
 .co-swatch {
-  width: 28px; height: 28px; border-radius: 50%;
-  border: 1px solid #e5e7eb; cursor: pointer;
+  width: 28px; 
+  height: 28px; 
+  border-radius: 50%;
+  border: 1px solid #e5e7eb; 
+  cursor: pointer;
 }
 
-/* ===== 텍스트 모드 ===== */
-.block-callout.callout--text { background: #ffffff; }
-.block-callout.callout--text .editable[data-type="callout"] { color:#111827; } /* default */
-.block-callout.callout--text.callout--gray   .editable[data-type="callout"] { color:#374151; }
-.block-callout.callout--text.callout--brown  .editable[data-type="callout"] { color:#8b5e3c; }
-.block-callout.callout--text.callout--orange .editable[data-type="callout"] { color:#c2410c; }
-.block-callout.callout--text.callout--yellow .editable[data-type="callout"] { color:#b45309; }
-.block-callout.callout--text.callout--green  .editable[data-type="callout"] { color:#15803d; }
-.block-callout.callout--text.callout--blue   .editable[data-type="callout"] { color:#1d4ed8; }
-.block-callout.callout--text.callout--purple .editable[data-type="callout"] { color:#6d28d9; }
-.block-callout.callout--text.callout--pink   .editable[data-type="callout"] { color:#be185d; }
-.block-callout.callout--text.callout--red    .editable[data-type="callout"] { color:#b91c1c; }
+/* 텍스트 스와치 (흰 배경 + 컬러 채움) */
+.co-swatch--text { background:#fff; }
+.co-swatch--text.co-swatch--default { box-shadow: inset 0 0 0 12px #111827; }
+.co-swatch--text.co-swatch--gray    { box-shadow: inset 0 0 0 12px #374151; }
+.co-swatch--text.co-swatch--brown   { box-shadow: inset 0 0 0 12px #8b5e3c; }
+.co-swatch--text.co-swatch--orange  { box-shadow: inset 0 0 0 12px #c2410c; }
+.co-swatch--text.co-swatch--yellow  { box-shadow: inset 0 0 0 12px #b45309; }
+.co-swatch--text.co-swatch--green   { box-shadow: inset 0 0 0 12px #15803d; }
+.co-swatch--text.co-swatch--blue    { box-shadow: inset 0 0 0 12px #1d4ed8; }
+.co-swatch--text.co-swatch--purple  { box-shadow: inset 0 0 0 12px #6d28d9; }
+.co-swatch--text.co-swatch--pink    { box-shadow: inset 0 0 0 12px #be185d; }
+.co-swatch--text.co-swatch--red     { box-shadow: inset 0 0 0 12px #b91c1c; }
 
 
 /* 배경 모드: 컬러 베이스에 낮은 알파(투명감) */
-/* 박스 배경 */
-.block-callout.callout--bg               { background: rgba(17,24,39,0.06); }   /* default */
-.block-callout.callout--bg.callout--gray    { background: rgba(55,65,81,0.08); }
-.block-callout.callout--bg.callout--brown   { background: rgba(139,94,60,0.10); }
-.block-callout.callout--bg.callout--orange  { background: rgba(194,65,12,0.10); }
-.block-callout.callout--bg.callout--yellow  { background: rgba(180,83,9,0.12); }
-.block-callout.callout--bg.callout--green   { background: rgba(21,128,61,0.10); }
-.block-callout.callout--bg.callout--blue    { background: rgba(29,78,216,0.10); }
-.block-callout.callout--bg.callout--purple  { background: rgba(109,40,217,0.10); }
-.block-callout.callout--bg.callout--pink    { background: rgba(190,24,93,0.10); }
-.block-callout.callout--bg.callout--red     { background: rgba(185,28,28,0.10); }
+.co-swatch--bg.co-swatch--default { background: rgba(17,24,39,0.06); }
+.co-swatch--bg.co-swatch--gray    { background: rgba(55,65,81,0.08); }
+.co-swatch--bg.co-swatch--brown   { background: rgba(139,94,60,0.10); }
+.co-swatch--bg.co-swatch--orange  { background: rgba(194,65,12,0.10); }
+.co-swatch--bg.co-swatch--yellow  { background: rgba(180,83,9,0.12); }
+.co-swatch--bg.co-swatch--green   { background: rgba(21,128,61,0.10); }
+.co-swatch--bg.co-swatch--blue    { background: rgba(29,78,216,0.10); }
+.co-swatch--bg.co-swatch--purple  { background: rgba(109,40,217,0.10); }
+.co-swatch--bg.co-swatch--pink    { background: rgba(190,24,93,0.10); }
+.co-swatch--bg.co-swatch--red     { background: rgba(185,28,28,0.10); }
 
 /* 배경 모드의 텍스트 컬러(눈 편한 다크) */
 .block-callout.callout--bg .editable[data-type="callout"] { color:#111827; }
+
 /* 아이콘 피커 */
 .co-icon-grid { display: grid; grid-template-columns: repeat(5, 32px); gap: 8px; }
 .co-icon-btn {
@@ -1164,21 +1176,12 @@ Css 커스터마이징 하기 위해서는 :root로 설정된 내용을 변경�
 }
 .co-icon-btn:hover { background:#f9fafb; border-color:#cbd5e1; }
 
-
 /* 아이콘 */
 .editable-wrapper.block-callout .callout-icon {
   flex: 0 0 auto; width: 1.25em; text-align: center;
   margin-top: 2px; line-height: 1; user-select: none; opacity: .95;
 }
 
-/* 텍스트 영역 */
-.editable-wrapper.block-callout .editable[data-type="callout"] {
-  flex: 1 1 auto;
-  min-height: 1.25rem;
-  white-space: pre-wrap;
-  word-break: break-word;
-  outline: none;
-}
 
 /* 비어있을 때 플레이스홀더 (포커스 아닐 때만) */
 .editable-wrapper.block-callout .editable[data-type="callout"]:not(:focus):empty::before {

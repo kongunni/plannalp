@@ -299,12 +299,22 @@ async function handleReindexResult(res) {
 // ===================================
 // 스케쥴 페이지
 // ===================================
-
+const safeParse = (s) => { try { return JSON.parse(s) } catch { return {} } };
 /* [1]  블록 목록 조회 - 전체 */
+// export const fetchBlocks = async () => {
+//     const response = await apiRequest("get", `/block`);
+//     return (response ?? []).sort((a, b) => a.order_index - b.order_index);
+// };
 export const fetchBlocks = async () => {
-    const response = await apiRequest("get", `/block`);
-    return (response ?? []).sort((a, b) => a.order_index - b.order_index);
+  const response = await apiRequest("get", `/block`);
+  const list = Array.isArray(response) ? response : (response?.blocks ?? []);
+  const normalized = list.map(b => ({
+    ...b,
+    meta: typeof b.meta === "string" ? safeParse(b.meta) : (b.meta || {})
+  }));
+  return normalized.sort((a,b)=>(a.order_index??0)-(b.order_index??0));
 };
+
 
 /* [1]  블록 목록 조회 - 단일 */
 export const fetchBlockById = async (bid) => {
@@ -402,20 +412,6 @@ export const deleteBlock = async (bid) => {
         throw err;
     }
 };
-// export const deleteBlock = async (bid) => {
-//     try {
-//       const response = await apiRequest("delete", `/block?bid=${bid}`);
-//       if (response?.reindexed) {
-//         console.log("⚠️ 삭제 후 리인덱싱 → 전체 블록 재로드");
-//         const refreshedBlocks = await fetchBlocks();
-//         return { ...response, reloadedBlocks: refreshedBlocks };
-//       }
-//       return response;
-//     } catch (error) {
-//       console.error("블록 삭제 실패", error);
-//       throw error;
-//     }
-// };
 
 
 /* [8] 블럭 순서 재정렬 prev, next 값 기반 */
@@ -450,17 +446,13 @@ export const reorderBlocksBatch = async (orderedBids) => {
 
 
 /** [11] 콜아웃 */
-export async function updateCallout(bid, { mode, color, iconId }) {
-  const res = await fetch("/api/block/callout", {
-    method: "PUT",
-    headers: { "Content-Type":"application/json" },
-    body: JSON.stringify({ bid, mode, color, iconId }),
-  });
-  return res.json();
-}
-// export async function updateCallout(bid, callout) {
-//   return apiRequest("/block/callout", "PUT", { bid, callout });
-// }
+export const updateCallout = async (bid, patch /* {mode?, color?, iconId?} */) => {
+  const res = await apiRequest("put", `/block/callout`, { bid, ...patch });
+  const block = res?.block ?? res ?? null;
+  if (block && typeof block.meta === "string") block.meta = safeParse(block.meta);
+  return block;
+};
+
 
 /*
 1. 할 일 블록 생성

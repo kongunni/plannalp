@@ -1,6 +1,4 @@
 // 해야될것 callout: 
-
-
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import "../styles/global.css";
 // 드래그앤드롭
@@ -14,7 +12,8 @@ import { usePageContext } from "../components/PageContext";
 import { updateBlockOrder } from "../services/PageService";
 // import { CSS } from "@dnd-kit/utilities";
 
-// 드래그앤 드롭
+
+
 const SortableBlock = ({
   block,
   index,
@@ -37,25 +36,37 @@ const SortableBlock = ({
   handleDividerInsert,
   handleDuplicateBlock,
   setCalloutColor,
-  setCalloutIcon
+  setCalloutIcon,
+  handleCalloutContainerClick
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: block.bid,
   });
 
-  // callout용
+  const { bid, type, content, meta } = block || {};
+  const mode   = meta?.callout?.mode;
+  const color  = meta?.callout?.color;
+  const iconId = meta?.callout?.iconId;
+
+  // 콜아웃 전용 루트
   const calloutRef = useRef(null);
 
-  // callout 불러올 때 DOM 갱신
+  // 1) 콜아웃: wrapper/아이콘/색/모드 변경시에만 DOM 재생성
+  
   useEffect(() => {
-    if (block.type !== "callout") return;
+    if (type !== "callout") return;
+
     const host = calloutRef.current;
     if (!host) return;
 
+    // 기존 DOM 제거
     host.innerHTML = "";
 
+    const blockForDom = { bid, type, content, meta };
+
+    // 새 DOM 생성
     const el = createCalloutBlock({
-      block,
+      block: blockForDom,
       index,
       handlers: {
         handleInputChange,
@@ -68,15 +79,35 @@ const SortableBlock = ({
       },
     });
 
+    // .block 중첩 방지
     el.classList && el.classList.remove("block");
+
+    // DOM 삽입
     host.appendChild(el);
-  }, [  
-      block, block.meta, index,
-      handleInputChange, handleKeyDown, handleBlur, handleFocus, editorRefs,
-      setCalloutColor, setCalloutIcon,
-  ]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, mode, color, iconId]);
 
+    // 2) 콜아웃 본문(text)만 content 변화에 따라 동기화
+    useEffect(() => {
+      if (type !== "callout") return;
+
+      const host = calloutRef.current;
+      if (!host) return;
+
+      const editable = host.querySelector('.editable[data-type="callout"]');
+      if (!editable) return;
+
+      // 타이핑 중이면 동기화 안함 (caret 보호)
+      if (document.activeElement === editable) return;
+
+      const next = (content || "").toString();
+      if (editable.innerText !== next) {
+        editable.innerText = next;
+      }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [content]);
+    
   // 드래그 css
   const style = {
     transform: transform ? `translate3d(0, ${Math.round(transform.y)}px, 0)`
@@ -97,7 +128,6 @@ const SortableBlock = ({
         onMouseLeave={handleMouseLeave}
         data-bid={block.bid}
         {...attributes}
-        // {...listeners}
     >
       {/* 핸들/플러스 */}
       {hoveredIndex === index && (
@@ -113,7 +143,6 @@ const SortableBlock = ({
           >+</span>
         </div>
       )}
-
       {/* divider */}
       {block.type === "divider" ? (
         <hr
@@ -162,7 +191,7 @@ const SortableBlock = ({
           <div
               className={`editable-wrapper ${getBlockClass(block.type)}`}
               data-type={block.type}
-              onClick={() => editorRefs.current[block.bid]?.focus()}
+              onClick={(e) => handleCalloutContainerClick(e, index)}
           >
             <div ref={calloutRef} />
           </div>
@@ -225,13 +254,13 @@ const BlockEditor = () => {
     handleChecklistToggle, handleDividerInsert,
     handleMouseEnter, handleMouseLeave, handleFocus, // handleChecklistContainerClick,
     handleDuplicateBlock,
+    handleCalloutContainerClick,
     // utils
     getBlockClass, editorRefs, 
     // getCaretOffsets, focusBlockStart, focusBlockEnd,
     commandPos,
     setCalloutColor, setCalloutIcon
     // 포커스 복원용 pendingFocusBidRef, 
-
   } = useBlockEditor(blocks, setBlocks);
 
   useEffect(() => {
@@ -248,6 +277,8 @@ const BlockEditor = () => {
   useEffect(() => {
     const list = Array.isArray(displayedBlocks) ? displayedBlocks : [];
     list.forEach((b) => {
+      if (b.type === "callout") return;
+
       const el = editorRefs.current[b.bid];
       if (!el) return;
       if (document.activeElement === el) return;
@@ -360,6 +391,7 @@ const BlockEditor = () => {
                 handleDuplicateBlock={handleDuplicateBlock}
                 setCalloutColor={setCalloutColor}
                 setCalloutIcon={setCalloutIcon}
+                handleCalloutContainerClick={handleCalloutContainerClick}
               />
              
               {/* after 인디케이터 */}

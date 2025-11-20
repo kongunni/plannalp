@@ -1100,11 +1100,8 @@ router.post("/block/reorder/batch", async (req, res) => {
 
 
 // ======================================================
-// [10] 콜아웃
+// [10] 콜아웃 블록 입력 수정
 // ======================================================
-/**
- * body: { bid: string, callout: { mode?: "text"|"bg", color?: colorKey, iconId?: 0..9 } }
- */
 router.put("/block/callout", async (req, res) => {
   try {
     const { bid, mode, color, iconId } = req.body || {};
@@ -1114,15 +1111,18 @@ router.put("/block/callout", async (req, res) => {
     const prevMeta = rows0?.[0]?.meta ? JSON.parse(rows0[0].meta) : {};
     const prevCO   = prevMeta.callout || {};
 
+    const MODE_OK = (m) => m === "text" || m === "bg";
+    const COLORS = new Set(["default","gray","brown","orange","yellow","green","blue","purple","pink","red"]);
+
     const nextCO = {
-      mode: (mode === "text" || mode === "bg") ? mode : prevCO.mode,
-      color: ([
-        "default","gray","brown","orange","yellow","green","blue","purple","pink","red"
-      ].includes(color) ? color : prevCO.color),
-      iconId: (Number.isInteger(iconId) && iconId >= 0 && iconId <= 9) ? iconId : prevCO.iconId
+      mode  : MODE_OK(mode) ? mode : prevCO.mode,
+      color : COLORS.has(color) ? color : prevCO.color,
+      iconId: (Number.isInteger(iconId) && iconId >= 0 && iconId <= 9) ? iconId : prevCO.iconId,
     };
 
+
     const nextMeta = { ...prevMeta, callout: nextCO };
+
     await db.query(
       "UPDATE nalp_schedule_block SET meta = CAST(? AS JSON) WHERE bid = ?",
       [JSON.stringify(nextMeta), bid]
@@ -1132,57 +1132,19 @@ router.put("/block/callout", async (req, res) => {
       "SELECT bid, type, content, meta, order_index, checked FROM nalp_schedule_block WHERE bid = ?",
       [bid]
     );
+
     const block = rows?.[0] || null;
+
     if (block?.meta && typeof block.meta === "string") {
       try { block.meta = JSON.parse(block.meta); } catch {}
     }
     res.json({ ok:true, block });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: "server error" });
   }
 });
-// router.put("/block/callout", async (req, res) => {
-//   try {
-//     const { bid, callout } = req.body || {};
 
-//     if (!bid || typeof callout !== "object") {
-//       return res.status(400).json({ ok: false, error: "bad_request" });
-//     }
-
-//     const cm = callout || {};
-//     const mode = MODES.has(cm.mode) ? cm.mode : undefined;
-//     const color = COLORS.has(cm.color) ? cm.color : undefined;
-//     const iconId = Number.isInteger(cm.iconId) && cm.iconId >= 0 && cm.iconId <= 9 ? cm.iconId : undefined;
-
-//     // 기존 메타 불러와 병합
-//     const [rows] = await db.query("SELECT meta FROM nalp_schedule_block WHERE bid = ?", [bid]);
-//     const currentMeta = rows?.[0]?.meta ? JSON.parse(rows[0].meta) : {};
-
-//     const nextMeta = { ...(currentMeta || {}) };
-//     nextMeta.callout = { ...(nextMeta.callout || {}) };
-//     if (mode)  nextMeta.callout.mode = mode;
-//     if (color) nextMeta.callout.color = color;
-//     if (iconId !== undefined) nextMeta.callout.iconId = iconId;
-//     if ("icon" in nextMeta.callout) delete nextMeta.callout.icon;
-
-//     await db.query(
-//       "UPDATE nalp_schedule_block SET meta = ? WHERE bid = ?",
-//       [JSON.stringify(nextMeta), bid]
-//     );
-
-//     const [updated] = await db.query(
-//       "SELECT bid, type, content, meta, order_index, checked FROM nalp_schedule_block WHERE bid = ?",
-//       [bid]
-//     );
-
-//     res.json({ ok: true, block: updated?.[0] || null });
-//   } catch (e) {
-//     console.error("[PUT /block/callout] error", e);
-//     res.status(500).json({ ok: false, error: "server_error" });
-//   }
-// });
 
 
 
