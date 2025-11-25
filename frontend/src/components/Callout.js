@@ -232,9 +232,12 @@ function buildIconPicker({ anchorEl, block, root, iconEl, setCalloutIcon }) {
 
 export function createCalloutBlock({ block, index, handlers }) {
   const {
-    handleInputChange, handleKeyDown, handleBlur, handleFocus, editorRefs,
-    setCalloutColor, setCalloutIcon, // ★ 추가 세터
+    editorRefs,
+    handleInputChange, handleKeyDown, handleBlur, handleFocus, 
+    setCalloutColor, setCalloutIcon, 
+    onCompositionStart, onCompositionEnd, 
   } = handlers || {};
+
   const meta = block.meta || {};
   block._index = index; // 내부 메뉴 콜백에서 index 접근 용이하게
 
@@ -259,12 +262,24 @@ export function createCalloutBlock({ block, index, handlers }) {
   const editable = document.createElement("div");
   editable.className = "editable";
   editable.contentEditable = "true";
+  editable.dataset.bid = block.bid;
   editable.dataset.type = "callout";
   editable.innerText = block.content || "";
+  editable.addEventListener('mousedown', (e) => e.stopPropagation());
+  editable.addEventListener('click', (e) => e.stopPropagation());
+  
+  if (typeof onCompositionStart === "function") {
+   editable.addEventListener("compositionstart", onCompositionStart);
+  }
+
+  if (typeof onCompositionEnd === "function") {
+    editable.addEventListener("compositionend", onCompositionEnd);
+  }
+
   if (handleFocus) editable.addEventListener("focus", (e) => handleFocus(e, index));
   if (handleInputChange) editable.addEventListener("input", (e) => handleInputChange(e, index));
   if (handleKeyDown) editable.addEventListener("keydown", (e) => handleKeyDown(e, index));
-  if (handleBlur) editable.addEventListener("blur", () => handleBlur(index, editable.innerText || ""));
+  if (handleBlur) editable.addEventListener("blur", (e) => handleBlur(index, e.currentTarget.innerText));
   wrap.appendChild(editable);
 
   // 설정 트리거(…)

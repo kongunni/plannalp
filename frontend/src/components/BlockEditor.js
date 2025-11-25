@@ -1,4 +1,7 @@
-// 해야될것 callout: 
+/*
+  onClick 처리 수정하기 
+  - onClick 이벤트 포커스 수정해야됨 각자 ㅏㄷ 수정 ㄱㄱ 
+*/ 
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import "../styles/global.css";
 // 드래그앤드롭
@@ -37,7 +40,8 @@ const SortableBlock = ({
   handleDuplicateBlock,
   setCalloutColor,
   setCalloutIcon,
-  handleCalloutContainerClick
+  handleCalloutContainerClick,
+  composingRef
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: block.bid,
@@ -76,6 +80,8 @@ const SortableBlock = ({
         editorRefs,
         setCalloutColor,
         setCalloutIcon,
+        onCompositionStart: () => { composingRef.current = true; },
+        onCompositionEnd:   () => { composingRef.current = false; },
       },
     });
 
@@ -167,7 +173,7 @@ const SortableBlock = ({
           <input
                 type="checkbox"
                 checked={!!block.checked}
-                  onClick={(e) => e.stopPropagation()} // 텍스트 포커스 방지
+                  onClick={(e) => e.stopPropagation()}
                   onChange={(e) => handleChecklistToggle(index, e.target.checked)}
           />
             <div
@@ -179,11 +185,12 @@ const SortableBlock = ({
                 ref={(el) => {
                   if (el) editorRefs.current[block.bid] = el;
                 }}
-                onMouseDown={(e) => e.preventDefault()} // 클릭 순간 텍스트 선택 방지
                 onInput={(e) => handleInputChange(e, index)}
                 onFocus={(e) => handleFocus(e, index)}
                 onBlur={(e) => handleBlur(index, e.currentTarget.innerText.trim())}
                 onKeyDown={(e) => handleKeyDown(e, index)}
+                onCompositionStart={() => { composingRef.current = true; }}
+                onCompositionEnd={() => { composingRef.current = false; }}
             />
           </div>
         </div>
@@ -216,6 +223,8 @@ const SortableBlock = ({
               onFocus={(e) => handleFocus(e, index)}
               onBlur={(e) => handleBlur(index, e.currentTarget.innerText.trim())}
               onKeyDown={(e) => handleKeyDown(e, index)}
+              onCompositionStart={() => { composingRef.current = true; }}
+              onCompositionEnd={() => { composingRef.current = false; }}
               />
           </div>
         )}
@@ -247,20 +256,17 @@ const BlockEditor = () => {
     selectedCommandIndex, 
     focusedIndex, setFocusedIndex,
     hoveredIndex,
-    // isEditableBlock, findPrevEditableIndex, findNextEditableIndex, setIsCommandActive, setFilteredCommands, setSelectedCommandIndex,
-
     // handlers
     handleInputChange, handleBlur, handleKeyDown, handleCommandSelect,
     handleChecklistToggle, handleDividerInsert,
-    handleMouseEnter, handleMouseLeave, handleFocus, // handleChecklistContainerClick,
+    handleMouseEnter, handleMouseLeave, handleFocus,
     handleDuplicateBlock,
     handleCalloutContainerClick,
     // utils
     getBlockClass, editorRefs, 
-    // getCaretOffsets, focusBlockStart, focusBlockEnd,
     commandPos,
-    setCalloutColor, setCalloutIcon
-    // 포커스 복원용 pendingFocusBidRef, 
+    setCalloutColor, setCalloutIcon,
+    composingRef
   } = useBlockEditor(blocks, setBlocks);
 
   useEffect(() => {
@@ -392,6 +398,7 @@ const BlockEditor = () => {
                 setCalloutColor={setCalloutColor}
                 setCalloutIcon={setCalloutIcon}
                 handleCalloutContainerClick={handleCalloutContainerClick}
+                composingRef={composingRef}
               />
              
               {/* after 인디케이터 */}
