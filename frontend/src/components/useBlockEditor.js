@@ -8,14 +8,14 @@ import {
 const useBlockEditor = (blocks, setBlocks ) => {
   // const isAddingBlock = useRef(false); // 블럭위치
   const editorRefs = useRef({});// 수정할 블럭위치
-  const pendingFocusBidRef = useRef(null);
+  const pendingFocusBidRef = useRef(null); // 포커스 이동 예약
   const isBlockEnd = useRef(false); // 문단 끝 위치 : divider이 맨 마지막에 위치할 때 사용
   const suppressTailOnceRef = useRef(false); // 문단 끝 위치한 블록 추가 끄기
 
   const draftRef = useRef({}); // { [bid]: string } 콜아웃 전용 드래프트
   const saveTimerRef = useRef({}); // { [bid]: number } 디바운스 타이머
   const enterOnceRef = useRef(false); //엔터 판정용
-  const composingRef = useRef(false); 
+  const composingRef = useRef(false); //IME 판정용
 
   const [focusedIndex, setFocusedIndex] = useState(null); // 드롭다운 포커스
   const [inputValue, setInputValue] = useState("");
@@ -25,8 +25,8 @@ const useBlockEditor = (blocks, setBlocks ) => {
   const [hoveredIndex, setHoveredIndex] = useState(null); 
   const [commandPos, setCommandPos] = useState({ top: 0, left: 0 }); // 드롭다운
 
-  // 입력 감지시 자동저장
-  const saveTimeout = useRef(null);
+  
+// const saveTimeout = useRef(null); // 입력 감지시 자동저장
 
   const blockCommands = [
       { type: "title1", label: "/제목1" },
@@ -69,6 +69,28 @@ const getBlockClass = (type) => {
 /* ==========================================
  *                   공통함수  
    ========================================== */
+// 순서재정렬 
+const sortByOrder = (arr = []) => {
+  return [...arr].sort((a, b) => {
+    const ao = a?.order_index ?? Number.POSITIVE_INFINITY;
+    const bo = b?.order_index ?? Number.POSITIVE_INFINITY;
+    if (ao !== bo) return ao - bo;
+    const ac = a?.created_at ? new Date(a.created_at).getTime() : 0;
+    const bc = b?.created_at ? new Date(b.created_at).getTime() : 0;
+    if (ac !== bc) return ac - bc;
+    return String(a?.bid ?? "").localeCompare(String(b?.bid ?? ""));
+  });
+};
+
+const normalizeAndSetBlocks = useCallback((next) => {
+  // next가 함수(updater)든 배열이든 처리
+  if (typeof next === "function") {
+    setBlocks((prev) => sortByOrder(next(prev)));
+  } else {
+    setBlocks(sortByOrder(next));
+  }
+}, [setBlocks]);
+
 // 편집 내부인지 확인용
 const getSafeRange = (rootEl) => {
   const sel = window.getSelection?.();
@@ -92,30 +114,69 @@ const isVisuallyEmpty = (el) => {
   return text.length === 0;
 };
 
-// 현재 캐럿이 위치한 줄의 가시 텍스트
-const getCurrentLineText = (el) => {
-  try {
-      const full = el.innerText || "";
-      const sel = window.getSelection();
-      if (!sel || sel.rangeCount === 0 || !el.contains(sel.anchorNode)) {
-        return normalizeText(full);
-      }
-      // 캐럿까지의 문자열 길이
-      const pre = document.createRange();
-      const range = sel.getRangeAt(0);
-      pre.selectNodeContents(el);
-      pre.setEnd(range.startContainer, range.startOffset);
-      const before = pre.toString();
 
-      // 현재 줄만 추출
-      const lastNL = before.lastIndexOf("\n");
-      const line = before.slice(lastNL + 1);
-      return normalizeText(line);
-    } catch {
-      return "";
-    }
+// 보이는 문자만 남기기
+const stripInvisible = (s = "") =>
+  (s || "")
+    .replace(/[\u200B\u200C\u200D\uFEFF\u00A0]/g, "")
+    .replace(/&nbsp;|&#160;/gi, "")
+    .replace(/\r?\n/g, "")
+    .trim();
+  
+
+// caret 뒤에 실질 텍스트/요소가 남아있는지(끝인지)
+const isCaretAtEnd = (rootEl) => {
+  const sel = window.getSelection?.();
+  if (!rootEl || !sel || sel.rangeCount === 0) return false;
+  const r = sel.getRangeAt(0);
+  if (!rootEl.contains(r.endContainer)) return false;
+
+  const post = document.createRange();
+  post.selectNodeContents(rootEl);
+  post.setStart(r.endContainer, r.endOffset);
+  // BR 들은 줄 경계일 뿐, 후속 줄 텍스트가 없으면 끝으로 간주한다.
+  const txt = stripInvisible(post.toString());
+  return txt.length === 0;
 };
 
+
+
+//오프셋 기반으로 안정화
+const getCurrentLineText = (el) => {
+  if (!el) return "";
+  const sel = window.getSelection?.();
+  if (!sel || sel.rangeCount === 0) return "";
+  const r = sel.getRangeAt(0);
+  if (!el.contains(r.startContainer)) return "";
+
+  // 커서까지의 가시 텍스트 길이
+  const offset = getCaretTextOffset(el); // 이미 가지고 계신 함수
+  const full = el.innerText || "";
+
+  // 현재 줄 시작 인덱스(없으면 0)
+  const lineStart = full.lastIndexOf("\n", Math.max(0, offset - 1)) + 1;
+  // 현재 줄 텍스트 = [줄 시작 ~ 커서]
+  const line = full.slice(lineStart, offset);
+  return stripInvisible(line);
+};
+
+// 🔧 블록 끝 판정은 유지(이름만 더 명확히)
+const isCaretAtBlockEnd = (el) => isCaretAtEnd(el);
+
+// 🆕 커서 뒤 텍스트(가시 기준) 확인 유틸
+const getAfterText = (el) => {
+  const sel = window.getSelection?.();
+  if (!el || !sel || sel.rangeCount === 0) return "";
+  const r = sel.getRangeAt(0);
+  if (!el.contains(r.endContainer)) return "";
+
+  const pre = document.createRange();
+  pre.selectNodeContents(el);
+  pre.setStart(r.endContainer, r.endOffset);
+  return stripInvisible(pre.toString());
+};
+
+// =====// =====// =====// =====// =====// =====// =====
 
 // 블록 타입 & 콘텐츠 업데이트 (서버 및 상태 동시 업데이트)
 const updateTypeAndContent = async (bid, index, type, content="") => {
@@ -123,19 +184,19 @@ const updateTypeAndContent = async (bid, index, type, content="") => {
   await updateBlockContent(bid, content);
   const updated = [ ...blocks ];
   updated[index] = { ...updated[index], type, content };
-  setBlocks(updated);
+  normalizeAndSetBlocks(updated);
 };
 
 // setBlocks 로컬 상태 업데이트 
 const updateBlockLocally = useCallback((index, changes) => {
-  setBlocks((prev) => {
+  normalizeAndSetBlocks((prev) => {
     if (!Array.isArray(prev)) return prev;
     if (index < 0 || index >= prev.length) return prev;
     const next = [...prev];
     next[index] = { ...next[index], ...changes };
     return next;
   });
-}, [setBlocks]);
+}, [normalizeAndSetBlocks]);
 
 // 리인덱싱 : 순서 재정렬
 const calculateOrderIndex = async (index) => {
@@ -147,7 +208,7 @@ const calculateOrderIndex = async (index) => {
     console.warn("⚠️ 간격 부족 → 리인덱싱 시도");
     await reindexBlocks();
     const refreshed= await fetchBlocks();
-    setBlocks(refreshed);
+    normalizeAndSetBlocks(refreshed);
     const refreshedPrev = refreshed[index]?.order_index ?? 1000;
     const refreshedNext = refreshed[index + 1]?.order_index ?? refreshedPrev + 1000;
     newOrder = Number(((refreshedPrev + refreshedNext) / 2).toFixed(6));
@@ -157,19 +218,55 @@ const calculateOrderIndex = async (index) => {
 
 
 // 리인덱싱 후 전체 Fetch처리
+// const safeAddBlock = async (type = "text", content = "", order_index, checked) => {
+//   const result = await addBlock(type, content, order_index, checked);
+//   if (result?.reloadedBlocks) {
+//     const block = result.reloadedBlocks.findIndex((b) => b.bid === result.bid) || null;
+//     return { block, reloadedBlocks: result.reloadedBlocks};
+//   }
+//   return { block: result ?? null, reloadedBlocks: null };
+// };
 const safeAddBlock = async (type = "text", content = "", order_index, checked) => {
   const result = await addBlock(type, content, order_index, checked);
-  if (result?.reloadedBlocks) {
-    const block = result.reloadedBlocks.findIndex((b) => b.bid === result.bid) || null;
-    return { block, reloadedBlocks: result.reloadedBlocks};
+  if (result?.reloadedBlocks && result?.bid != null) {
+    const list = sortByOrder(result.reloadedBlocks);
+    // const list = [...result.reloadedBlocks].sort((a,b) => (a.order_index ?? 0) - (b.order_index ?? 0));
+    const newBlock = list.find(b => b.bid === result.bid) || null;
+    return { block: newBlock, reloadedBlocks: list };
   }
-  return { block: result ?? null, reloadedBlocks: null };
+  const newBlock = result?.block ?? result ?? null;
+  if (newBlock && order_index != null && newBlock.order_index == null) {
+    newBlock.order_index = order_index;
+  }
+  return { block: newBlock, reloadedBlocks: null };
 };
-
 
 // ================================================
 // 블록 추가후 처리
 // ================================================
+
+const insertTextBlockAfter = async (index) => {
+  const newOrder = await calculateOrderIndex(index);
+  const { block: newBlock, reloadedBlocks } = await safeAddBlock("text", "", newOrder);
+  if (!newBlock) return null;
+
+  if (reloadedBlocks) {
+    normalizeAndSetBlocks(reloadedBlocks); // 이미 정렬됨
+  } else {
+    normalizeAndSetBlocks(prev => { 
+      const before = prev.slice(0, index + 1);
+      const after  = prev.slice(index + 1);
+      return [...before, newBlock, ...after]; 
+    });
+    // setBlocks(prev => {
+    //   const before = prev.slice(0, index + 1);
+    //   const after  = prev.slice(index + 1);
+    //   return sortByOrder([...before, newBlock, ...after]);
+    // });
+  }
+  pendingFocusBidRef.current = newBlock.bid;
+  return newBlock;
+};
 
 // 콜아웃, 토글, 인용 등 사용 : 줄바꿈 <br>
 const insertBreak = (el) => {
@@ -177,16 +274,41 @@ const insertBreak = (el) => {
   if (!range) return;
 
   const br = document.createElement("br");
-  
-  // 커서 포커싱
   range.insertNode(br);
-  range.setStartAfter(br);
-  range.collapse(true);
+
+  // 줄 끝에서 줄바꿈이면 크롬/WebKit에서 캐럿이 줄 뒤로 못 가는 현상 방지
+  const atBlockEnd = isCaretAtBlockEnd(el);
+  if (atBlockEnd) {
+    const zw = document.createTextNode("\u200B");
+    range.setStartAfter(br);
+    range.collapse(false);
+    range.insertNode(zw);
+    range.setStartAfter(zw);
+  } else {
+    range.setStartAfter(br);
+    range.collapse(true);
+  }
 
   const sel = window.getSelection();
   sel.removeAllRanges();
   sel.addRange(range);
 };
+
+// const insertBreak = (el) => {
+//   const range = getSafeRange(el);
+//   if (!range) return;
+
+//   const br = document.createElement("br");
+  
+//   // 커서 포커싱
+//   range.insertNode(br);
+//   range.setStartAfter(br);
+//   range.collapse(true);
+
+//   const sel = window.getSelection();
+//   sel.removeAllRanges();
+//   sel.addRange(range);
+// };
 
 // 체크리스트 : 엔터시 새 항목 추가
 const insertChecklistAfter = async (index) => {
@@ -195,68 +317,62 @@ const insertChecklistAfter = async (index) => {
   if (!newBlock) return null;
 
   if (reloadedBlocks) {
-    setBlocks(reloadedBlocks);
+    normalizeAndSetBlocks(reloadedBlocks);
   } else {
-    setBlocks(prev => {
+    normalizeAndSetBlocks(prev => {
       const before = prev.slice(0, index + 1);
       const after  = prev.slice(index + 1);
       return [...before, newBlock, ...after];
     });
   }
-  requestAnimationFrame(() => {
-    const nextEl = editorRefs.current[newBlock.bid];
-    if (nextEl) {
-      nextEl.dataset.lastEmptyEnter = "1";
-      focusAndPlaceCaretEnd(nextEl);
-    }
-  });
+  pendingFocusBidRef.current = newBlock.bid;
   return newBlock;
 };
 
 // 텍스트 블록 추가 : 더블엔터 시 처리 : 토글, 인용, 콜아웃 등
-const insertTextBlockAfter = async(index) => {
-  const newOrder = await calculateOrderIndex(index);
-  const { block: newBlock, reloadedBlocks } = await safeAddBlock("text", "", newOrder);
-  if (!newBlock) return null;
+// const insertTextBlockAfter = async(index) => {
+//   const newOrder = await calculateOrderIndex(index);
+//   const { block: newBlock, reloadedBlocks } = await safeAddBlock("text", "", newOrder);
+//   if (!newBlock) return null;
   
-  if (reloadedBlocks) {
-    setBlocks(reloadedBlocks);
-  } else {
-    setBlocks(prev => {
-      const before = prev.slice(0, index + 1);
-      const after  = prev.slice(index + 1);
-      return [...before, newBlock, ...after];
-    });
-  }
-  // 새 블록으로 포커스 이동
-  requestAnimationFrame(() => {
-    const nextEl = editorRefs.current[newBlock.bid] || document.querySelector(`.editable[data-bid="${newBlock.bid}"]`); ;
-    nextEl && focusAndPlaceCaretEnd(nextEl);
-  });
-  return;
-}; 
+//   if (reloadedBlocks) {
+//     setBlocks(reloadedBlocks);
+//   } else {
+//     setBlocks(prev => {
+//       const before = prev.slice(0, index + 1);
+//       const after  = prev.slice(index + 1);
+//       return [...before, newBlock, ...after];
+//     });
+//   }
+//   pendingFocusBidRef.current = newBlock.bid;
+//   return newBlock;
+// }; 
 
 // 콜아웃 외곽 클릭 시 포커스
 const handleCalloutContainerClick = (e, index) => {
   const target = e.target;
   if (!(target instanceof HTMLElement)) return;
 
-  // 아이콘/색상 메뉴/스와치 등을 클릭한 경우에는 포커스 강제 이동 금지
+  // 설정창 클릭시 강제 포커스 이동 방지
   if (
     target.closest(".callout-icon") ||
     target.closest(".callout-menu-trigger") ||
     target.closest(".co-swatch") ||
     target.closest(".co-icon-btn")
-  ) {
-    return;
-  }
-  if (target.closest('.editable')) return;
+  )  return; 
+
   
   const bid = blocks[index]?.bid;
-  const el = editorRefs.current[bid];
-  if (el) {
-    focusAndPlaceCaretEnd(el);
+  const editable = editorRefs.current[bid];
+  if (!editable) return;
+
+  // 본문을 클릭했는지 이중 판정
+  if (target.closest('.editable') || editable.contains(target)) {
+    return;
   }
+
+  e.preventDefault();
+  focusAndPlaceCaretEnd(editable);
 };
 
 
@@ -272,12 +388,30 @@ const handleMouseEnter = (index) => { setHoveredIndex(index); };
 const handleMouseLeave = () => { setHoveredIndex(null); };
 
 // 텍스트 입력 감지 후 2초뒤 자동 저장 
-const debounceUpdateContent = (index, value, delay = 2000) => {
-  if (saveTimeout.current) clearTimeout(saveTimeout.current);
-  saveTimeout.current = setTimeout(() => {
-    const bid = blocks[index]?.bid;
-    if (bid) updateBlockContent(bid, value).catch(console.error);
+const debounceUpdateContent = (bid, value, delay = 2000) => {
+  if (!bid) return;
+  if (saveTimerRef.current[bid]) clearTimeout(saveTimerRef.current[bid]);
+
+  saveTimerRef.current[bid] = setTimeout(async () => {
+    try {
+      await updateBlockContent(bid, value);
+      normalizeAndSetBlocks(prev => {
+        const idx = prev?.findIndex?.(b => b.bid === bid);
+        if (idx == null || idx < 0) return prev;
+        if (prev[idx]?.content === value) return prev;
+        const next = [...prev];
+        next[idx] = { ...next[idx], content: value };
+        return next;
+      });
+    } finally {
+      delete saveTimerRef.current[bid];
+    }
   }, delay);
+//  if (saveTimeout.current) clearTimeout(saveTimeout.current);
+//   saveTimeout.current = setTimeout(() => {
+//     const bid = blocks[index]?.bid;
+//     if (bid) updateBlockContent(bid, value).catch(console.error);
+//   }, delay);
 };
 
 /* ==========================================
@@ -317,7 +451,7 @@ const getCaretOffsets = (rootEl) => {
 };
 
 // 문단 끝에 포커싱
-const focusAndPlaceCaretEnd = (el) => {
+const focusAndPlaceCaretEnd = useCallback((el) => {
   if (!el || !document.body.contains(el)) return;
   el.focus();
   const range = document.createRange();
@@ -326,7 +460,7 @@ const focusAndPlaceCaretEnd = (el) => {
   const sel = window.getSelection();
   sel.removeAllRanges();
   sel.addRange(range);
-};
+}, []);
 
 const focusBlockEnd = (bid) => {
   const el = editorRefs.current[bid];
@@ -374,9 +508,9 @@ const appendAfterDivider = async () => {
     const { block: newBlock, reloadedBlocks } = await safeAddBlock("text", "", newOrder);
     if (!newBlock) return;
     if (reloadedBlocks) {
-      setBlocks(reloadedBlocks);
+      normalizeAndSetBlocks(reloadedBlocks);
     } else {
-      setBlocks((prev) => [...prev, newBlock]);
+      normalizeAndSetBlocks((prev) => [...prev, newBlock]);
     }  
    window.dispatchEvent(new CustomEvent("blocks:changed", {
       detail: { reason: "normalize-tail", newBid: newBlock.bid, source: "editor-local" }
@@ -427,7 +561,7 @@ const setCalloutColor = useCallback(async (index, mode, color) => {
   if (!bid || target.type !== "callout") return;
   await updateCallout(bid, { mode, color });
   // 로컬 반영 (함수형)
-  setBlocks(prev => {
+  normalizeAndSetBlocks(prev => {
     if (!prev?.[index]) return prev;
     const before = prev[index];
     const nextMeta = {
@@ -438,7 +572,7 @@ const setCalloutColor = useCallback(async (index, mode, color) => {
     next[index] = { ...before, meta: nextMeta };
     return next;
   });
-}, [setBlocks, blocks]);
+}, [normalizeAndSetBlocks, blocks]);
  
  //아이콘 
 const setCalloutIcon = useCallback(async (index, iconId) => {
@@ -446,7 +580,7 @@ const setCalloutIcon = useCallback(async (index, iconId) => {
   if (!target || target.type !== "callout") return;
   if (!Number.isInteger(iconId) || iconId < 0 || iconId > 9) return;
   await updateCallout(target.bid, { iconId });
-  setBlocks(prev => {
+  normalizeAndSetBlocks(prev => {
     if (!prev?.[index]) return prev;
     const before = prev[index];
     const nextMeta = {
@@ -457,7 +591,7 @@ const setCalloutIcon = useCallback(async (index, iconId) => {
     next[index] = { ...before, meta: nextMeta };
     return next;
   });
-}, [setBlocks, blocks]);
+}, [normalizeAndSetBlocks, blocks]);
 
 // 콜아웃 저장 디바운스
 const debounceSaveCallout = useCallback((bid, value, delay = 500) => {
@@ -466,7 +600,7 @@ const debounceSaveCallout = useCallback((bid, value, delay = 500) => {
     try {
       await updateBlockContent(bid, value);
 
-      setBlocks(prev => {
+      normalizeAndSetBlocks(prev => {
         const idx = prev?.findIndex?.(b => b.bid === bid);
         if (idx == null || idx < 0) return prev;
         if (prev[idx]?.content === value) return prev;
@@ -479,7 +613,7 @@ const debounceSaveCallout = useCallback((bid, value, delay = 500) => {
       delete saveTimerRef.current[bid];
     }
   }, delay);
-}, [setBlocks]);
+}, [normalizeAndSetBlocks]);
 
 
 // 외부에서 필요하면 드래프트 조회
@@ -529,14 +663,14 @@ const splitBlockAtCursor = async (index) => {
     
     // 3) 로컬 상태 반영
     if (reloadedBlocks) {
-      setBlocks(reloadedBlocks);
+      normalizeAndSetBlocks(reloadedBlocks);
     } else {
       const updated = [
         ...blocks.slice(0, index + 1),
         { ...newBlock, content: after },
         ...blocks.slice(index + 1),
       ];
-      setBlocks(updated);
+      normalizeAndSetBlocks(updated);
     }
 
     // 4) 커서 포커스 추가된 블록 끝으로
@@ -569,14 +703,14 @@ const handleDuplicateBlock = async (index) => {
   const { block: newBlock, reloadedBlocks } = await safeAddBlock(type, content, newOrder, checked);
   if (!newBlock) return;
   if (reloadedBlocks) {
-    setBlocks(reloadedBlocks);
+    normalizeAndSetBlocks(reloadedBlocks);
   } else {
     const updated = [
       ...blocks.slice(0, index + 1),
       { ...newBlock, content, checked },
       ...blocks.slice(index + 1),
     ];
-    setBlocks(updated);
+    normalizeAndSetBlocks(updated);
   }
 
   // 포커스는 새 블록 끝으로
@@ -607,6 +741,9 @@ const handleDuplicateBlock = async (index) => {
 *  드롭다운 명령어 포커스
 */
 const handleFocus = (e, index) => {
+  
+  pendingFocusBidRef.current = null;
+
   const bid = blocks[index]?.bid;
   const el = e.currentTarget;
 
@@ -632,7 +769,7 @@ const handleFocus = (e, index) => {
 
     if (updated[index]) {
       updated[index].content = "";
-      setBlocks(updated);
+      normalizeAndSetBlocks(updated);
     }
   }
 
@@ -643,10 +780,10 @@ const handleFocus = (e, index) => {
  * 명령어 입력 감지, 블록 컨텐트 업데이트 
  */
 const handleInputChange = (e, index) => {
-  const value = e.target.innerText;
-  setInputValue(value);
-  
+  const value = e.currentTarget.innerText;
   const block = blocks[index];
+  if (!block) return;
+  const bid = block.bid;
   const type = e.currentTarget.dataset.type || "text";
 
   // 2) 명령어 감지
@@ -660,20 +797,17 @@ const handleInputChange = (e, index) => {
     setFilteredCommands([]);
   }
 
-  // 2) 콜아웃: 드래프트 관리, setBlocks는 디바운스 저장 시점에만
+  // 2) 콜아웃 드래프트 + 콜아웃용 디바운스 저장만
   if (type === "callout") {
-    const bid = block.bid;
-    const valueText = e.currentTarget.innerText;
-    draftRef.current[bid] = valueText;
-
+    draftRef.current[bid] = value;
     const el = editorRefs.current[bid];
     if (el) el.dataset.lastEmptyEnter = isVisuallyEmpty(el)? "1" : "0";
     debounceSaveCallout(bid, value);
     return; 
   }
-  // 3) 그외 프론트 상태 업데이트
+  // 3) 그외 일반 블록 프론트 상태 업데이트 + bid기반 디바운스 저장
   updateBlockLocally(index, { content: value });
-  debounceUpdateContent(index, value);
+  debounceUpdateContent(bid, value);
 };
 
 /* 
@@ -758,8 +892,12 @@ const handleChecklistToggle = async (index, checked) => {
         r.collapse(false);
         const sel = window.getSelection();
         sel.removeAllRanges();
-        sel.addRange();
+        sel.addRange(r);
       }
+      // range 값 구해서 없으면 종료
+      const fixed = getSafeRange(el);
+      if (!fixed) return;
+
       return;
     }
     // 1) 드롭다운 활성: ↑/↓는 드롭다운 항목 이동
@@ -811,7 +949,14 @@ const handleChecklistToggle = async (index, checked) => {
     const selection = window.getSelection();
     const cursorPos = selection?.getRangeAt(0)?.startOffset ?? 0;
     // const isEmpty = fullText.trim() === "";
-
+    if (!getSafeRange(el)) {
+      el.focus();
+      const r = document.createRange();
+      r.selectNodeContents(el);
+      r.collapse(false);
+      const sel = window.getSelection();
+      if (sel) { sel.removeAllRanges(); sel.addRange(r) };
+    }
     // 앞 블록과 병합
     if (e.key === "Backspace") {
       
@@ -834,7 +979,7 @@ const handleChecklistToggle = async (index, checked) => {
         const dividerBid = blocks[index - 1].bid;
         try {
           await deleteBlock(dividerBid);
-          setBlocks((prev) => prev.filter((b) => b.bid !== dividerBid));
+          normalizeAndSetBlocks((prev) => prev.filter((b) => b.bid !== dividerBid));
         } catch (err) {
           console.error("[divider 삭제 실패] ", err);
         }
@@ -866,39 +1011,80 @@ const handleChecklistToggle = async (index, checked) => {
       enterOnceRef.current = true;
       Promise.resolve().then(()=> { enterOnceRef.current = false; });
 
-      // shift + enter : 줄바꿈
+      
+      // ───────────────────────────────────────────────
+      // < Shift + Enter >로 줄바꿈 실행
+      // ───────────────────────────────────────────────
       if(e.shiftKey) {
-        if (type === "callout" || type === "toggle" || type === "quote" || type === "text") {
-          e.preventDefault();
-          insertBreak(el);
-          debounceSaveCallout(bid, el.innerText);
+         if (type === "callout" || type === "toggle" || type === "quote") {
+            e.preventDefault();
+            if (type === "callout") {
+              if (saveTimerRef.current[bid]) {
+                clearTimeout(saveTimerRef.current[bid]);  
+                delete saveTimerRef.current[bid];
+              }
+              try {
+                await updateBlockContent(bid, e.currentTarget.innerText);
+              } catch (error) {
+                console.error("[shift enter 실패]", error);
+              }
+            }
+            await insertTextBlockAfter(index);
+            return
+         }
+          // 2) 일반 텍스트: 줄바꿈 유지
+          if (type === "text") {
+            insertBreak(el);
+            debounceUpdateContent(bid, el.innerText);
+            return;
+          }
           return;
-        }
       }
 
+      // ───────────────────────────────────────────────
+      // < Enter >만 실행
+      // ───────────────────────────────────────────────
       // 1) 콜아웃
       if (type === "callout") {
         e.preventDefault();
-        
-        // (A) 블록 전체가 가시적으로 비어있으면 → 즉시 탈출
-        if (isVisuallyEmpty(el)) {
+
+        const full = el.innerText || "";
+        const fullStripped = stripInvisible(full);
+
+        // (A) 전체가 비어있으면 종료
+        if (fullStripped === "") {
           await insertTextBlockAfter(index);
           return;
         }
 
-        // (B) 현재 줄이 비어있으면 → 탈출
-        const currentLine = getCurrentLineText(el); // normalize 포함
-        if (currentLine.length === 0) {
+        // 현재 줄/뒤쪽 텍스트 계산: 오프셋 기반
+        const lineText = getCurrentLineText(el);   // 현재 줄의 (커서 앞) 가시 텍스트
+        const afterText = getAfterText(el);        // 커서 뒤의 가시 텍스트
+        const atBlockEnd = isCaretAtBlockEnd(el);  // 블록 전체 기준 끝 여부
+
+        // 1) "<br>로 시작" == 현재 줄의 (커서 앞) 가시 텍스트가 빈 문자열
+        const lineStartsWithBr = (lineText === "");
+        // 2) "끝에 아무 텍스트도 없음" == 커서 뒤 가시 텍스트가 없음(= 블록 끝)
+        const nothingAfter = (afterText === "") || atBlockEnd;
+
+        // 1. <br>로 시작 + 끝에 아무 텍스트도 없으면 → 콜아웃 종료
+        if (lineStartsWithBr && nothingAfter) {
           await insertTextBlockAfter(index);
           return;
         }
 
-        // (C) 그 외 → 내부 줄바꿈
+        // 2. <br>로 시작하지만 뒤에(혹은 커서 뒤) 텍스트가 하나라도 있으면 → 내부 줄바꿈 삽입
+        //    (띄어쓰기 포함이므로 stripInvisible 기준으로 비/유 판단)
+        if (lineStartsWithBr && afterText !== "") {
+          insertBreak(el);
+          debounceSaveCallout(bid, el.innerText, 2000);
+          return;
+        }
+        // 3. 그 외 일반 케이스 → 내부 줄바꿈 삽입
         insertBreak(el);
-        el.dataset.lastEmptyEnter = isVisuallyEmpty(el) ? "1" : "0";
         debounceSaveCallout(bid, el.innerText, 2000);
         return;
-      } 
+      }
 
       // 2) 토글 
       if (["toggle", "quote"].includes(type)) {
@@ -1017,13 +1203,13 @@ const handleBackspace = async (e, index) => {
   if (blocks.length === 1) {
     await updateTypeAndContent(bid, index, "text", "");
     // 마지막 하나 남으면 초기화만
-    setBlocks([{ ...block, type: "text", content: "" }]);
+    normalizeAndSetBlocks([{ ...block, type: "text", content: "" }]);
     return;
   }
   // 그 외는 그냥 삭제
   await deleteBlock(bid);
   const updated = blocks.filter((_, i) => i !== index);
-  setBlocks(updated);
+  normalizeAndSetBlocks(updated);
     requestAnimationFrame(() => {
       const prev = document.querySelector(
         `.block:nth-child(${index}) .editable`
@@ -1052,7 +1238,7 @@ const handleBackspace = async (e, index) => {
       if (i === currentIndex) return null;
       return b;
     }).filter(Boolean);
-    setBlocks(updated);
+    normalizeAndSetBlocks(updated);
 
     // 3) 화면에 즉시 병합된 내용 반영
     requestAnimationFrame(() => {
@@ -1085,9 +1271,9 @@ const handleBackspace = async (e, index) => {
       const { block: textBlock, reloadedBlocks } = await safeAddBlock("text", "", textOrder);
       if (!textBlock) return;
       if (reloadedBlocks) {
-        setBlocks(reloadedBlocks);
+        normalizeAndSetBlocks(reloadedBlocks);
       } else {
-        setBlocks((prev) => {
+        normalizeAndSetBlocks((prev) => {
           const i = prev.findIndex((b) => b.bid === bid);
           if (i < 0) return prev;
           return [...prev.slice(0, i + 1), textBlock, ...prev.slice(i + 1)];

@@ -1,11 +1,7 @@
-/*
-  onClick 처리 수정하기 
-  - onClick 이벤트 포커스 수정해야됨 각자 ㅏㄷ 수정 ㄱㄱ 
-*/ 
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import "../styles/global.css";
 // 드래그앤드롭
-import { DndContext, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { DndContext, PointerSensor, useSensor, useSensors, DragOverlay, closestCenter } from "@dnd-kit/core";
 import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable} from "@dnd-kit/sortable";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 // import
@@ -15,9 +11,8 @@ import { usePageContext } from "../components/PageContext";
 import { updateBlockOrder } from "../services/PageService";
 // import { CSS } from "@dnd-kit/utilities";
 
-
-
-const SortableBlock = ({
+// const SortableBlock = ({
+const SortableBlock = React.memo(function SortableBlock({
   block,
   index,
   hoveredIndex,
@@ -41,9 +36,21 @@ const SortableBlock = ({
   setCalloutColor,
   setCalloutIcon,
   handleCalloutContainerClick,
-  composingRef
-}) => {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  composingRef,
+}) {
+// }) => {
+  const focusEnd = (el) => {
+    if (!el || !document.body.contains(el)) return;
+    el.focus();
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    r.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(r);
+  };
+  
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging, setActivatorNodeRef } = useSortable({
     id: block.bid,
   });
 
@@ -56,18 +63,14 @@ const SortableBlock = ({
   const calloutRef = useRef(null);
 
   // 1) 콜아웃: wrapper/아이콘/색/모드 변경시에만 DOM 재생성
-  
   useEffect(() => {
     if (type !== "callout") return;
 
     const host = calloutRef.current;
     if (!host) return;
-
-    // 기존 DOM 제거
-    host.innerHTML = "";
+    host.innerHTML = ""; // 기존 DOM 제거
 
     const blockForDom = { bid, type, content, meta };
-
     // 새 DOM 생성
     const el = createCalloutBlock({
       block: blockForDom,
@@ -84,48 +87,44 @@ const SortableBlock = ({
         onCompositionEnd:   () => { composingRef.current = false; },
       },
     });
-
-    // .block 중첩 방지
-    el.classList && el.classList.remove("block");
-
-    // DOM 삽입
+    el.classList && el.classList.remove("block"); // .block 중첩 방지
     host.appendChild(el);
-
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [type, mode, color, iconId]);
+  // }, [type, mode, color, iconId, bid, content, meta, handleInputChange, handleKeyDown, handleBlur, handleFocus, editorRefs, setCalloutColor, setCalloutIcon, composingRef]);
 
-    // 2) 콜아웃 본문(text)만 content 변화에 따라 동기화
-    useEffect(() => {
-      if (type !== "callout") return;
+  // 2) 콜아웃 본문(text)만 content 변화에 따라 동기화
+  useEffect(() => {
+    if (type !== "callout") return;
 
-      const host = calloutRef.current;
-      if (!host) return;
+    const host = calloutRef.current;
+    if (!host) return;
+    const editable = host.querySelector('.editable[data-type="callout"]');
+    if (!editable) return;
 
-      const editable = host.querySelector('.editable[data-type="callout"]');
-      if (!editable) return;
+    // 타이핑 중이면 동기화 안함 (caret 보호)
+    if (document.activeElement === editable) return;
 
-      // 타이핑 중이면 동기화 안함 (caret 보호)
-      if (document.activeElement === editable) return;
-
-      const next = (content || "").toString();
-      if (editable.innerText !== next) {
-        editable.innerText = next;
-      }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [content]);
-    
-  // 드래그 css
+    const next = (content || "").toString();
+    if (editable.innerText !== next) {
+      editable.innerText = next;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, content]);
+  // }, [content]);
+  
+  //드래그 css
   const style = {
     transform: transform ? `translate3d(0, ${Math.round(transform.y)}px, 0)`
     : undefined,
     transition,
-    opacity: isDragging ? 0.9 : 1,
+    opacity: isDragging ? 0 : 1,
     willChange: 'transform',
     backfaceVisibility: 'hidden',
   };
 
   return(
-  <React.Fragment>
+    <React.Fragment>
     <div
         className="block"
         ref={setNodeRef}
@@ -138,7 +137,13 @@ const SortableBlock = ({
       {/* 핸들/플러스 */}
       {hoveredIndex === index && (
         <div className="block-handle">
-          <span className="drag-handle" {...listeners}>::</span>
+          <span className="drag-handle" 
+                ref={setActivatorNodeRef}
+                {...attributes}
+                {...listeners}
+          >
+            ::
+          </span>
           <span
                 className="add-block"
                 onMouseDown={(e) => {
@@ -149,32 +154,28 @@ const SortableBlock = ({
           >+</span>
         </div>
       )}
+
       {/* divider */}
       {block.type === "divider" ? (
-        <hr
-            className="block-divider"
-            data-type={block.type}
-            tabIndex={-1}
-            aria-hidden="true"
-        />
+        <hr className="block-divider" data-type={block.type} tabIndex={-1} aria-hidden="true" />
       ) : block.type === "checklist" ? (
       // checklist
       <div className={`editable-wrapper ${getBlockClass(block.type)}`} data-type={block.type}>
         <div
             className="checklist-item"
-            onClick={(e) => {
-              const isInput = e.target instanceof HTMLElement && e.target.tagName === "INPUT";
-              if (!isInput) {
-                e.preventDefault();
-                editorRefs.current[block.bid]?.focus();
-              }
+            onClick={(e) => { 
+              const target = e.target;
+              if (!(target instanceof HTMLElement)) return;
+              if (target.tagName === "INPUT" || target.closest('.editable')) return;
+              const el = editorRefs.current[block.bid];
+              if (el) { focusEnd(el); }
             }}
         >
           <input
                 type="checkbox"
                 checked={!!block.checked}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => handleChecklistToggle(index, e.target.checked)}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => handleChecklistToggle(index, e.target.checked)}
           />
             <div
                 className={`editable checklist-text ${getBlockClass(block.type)} ${block.checked ? "checked" : ""}`}
@@ -182,59 +183,65 @@ const SortableBlock = ({
                 suppressContentEditableWarning
                 data-type={block.type}
                 data-bid={block.bid}
-                ref={(el) => {
-                  if (el) editorRefs.current[block.bid] = el;
-                }}
+                ref={(el) => { if (el) editorRefs.current[block.bid] = el; }}
                 onInput={(e) => handleInputChange(e, index)}
                 onFocus={(e) => handleFocus(e, index)}
-                onBlur={(e) => handleBlur(index, e.currentTarget.innerText.trim())}
+                onBlur={(e) => handleBlur(index, e.currentTarget.innerText)}
                 onKeyDown={(e) => handleKeyDown(e, index)}
                 onCompositionStart={() => { composingRef.current = true; }}
                 onCompositionEnd={() => { composingRef.current = false; }}
             />
-          </div>
         </div>
-        ) : block.type === "callout" ? (
-          <div
-              className={`editable-wrapper ${getBlockClass(block.type)}`}
-              data-type={block.type}
-              onClick={(e) => handleCalloutContainerClick(e, index)}
-          >
-            <div ref={calloutRef} />
-          </div>
-        ): (
-        // 일반 블록
-        <div
-            className={`editable-wrapper ${getBlockClass(block.type)}`}
-            data-type={block.type}
-            onClick={() => editorRefs.current[block.bid]?.focus()}
-        >
-        {block.content === "" && focusedIndex === index && (<span className="blockPlaceholder">명령어 사용 시에는 '/'를 누르세요...</span>)}
-          <div
-              className={`editable ${getBlockClass(block.type)}`}
-              contentEditable
-              suppressContentEditableWarning
-              data-type={block.type}
-              data-bid={block.bid}
-              ref={(el) => {
-                if (el) editorRefs.current[block.bid] = el;
-              }}
-              onInput={(e) => handleInputChange(e, index)}
-              onFocus={(e) => handleFocus(e, index)}
-              onBlur={(e) => handleBlur(index, e.currentTarget.innerText.trim())}
-              onKeyDown={(e) => handleKeyDown(e, index)}
-              onCompositionStart={() => { composingRef.current = true; }}
-              onCompositionEnd={() => { composingRef.current = false; }}
-              />
-          </div>
-        )}
       </div>
+      ) : block.type === "callout" ? (
+        <div
+            className={`editable-wrapper block-callout-wrapper`}
+            // className={`editable-wrapper ${getBlockClass(block.type)}`}
+            data-type={block.type}
+            onMouseDown={(e) => handleCalloutContainerClick(e, index)}
+        >
+          <div ref={calloutRef} />
+        </div>
+      ): (
+      // 일반 블록
+      <div
+          className={`editable-wrapper ${getBlockClass(block.type)}`}
+          data-type={block.type}
+          onClick={(e) => {
+            if (e.target.closest('.editable')) return;
+            const el = editorRefs.current[block.bid];
+            if (el) { focusEnd(el); }
+          }}
+      >
+      {block.content === "" && focusedIndex === index && (<span className="blockPlaceholder">명령어 사용 시에는 '/'를 누르세요...</span>)}
+        <div
+            className={`editable ${getBlockClass(block.type)}`}
+            contentEditable
+            suppressContentEditableWarning
+            data-type={block.type}
+            data-bid={block.bid}
+            ref={(el) => { if (el) editorRefs.current[block.bid] = el; }}
+            onInput={(e) => handleInputChange(e, index)}
+            onFocus={(e) => handleFocus(e, index)}
+            onBlur={(e) => handleBlur(index, e.currentTarget.innerText)}
+            onKeyDown={(e) => handleKeyDown(e, index)}
+            onCompositionStart={() => { composingRef.current = true; }}
+            onCompositionEnd={() => { composingRef.current = false; }}
+          />
+        </div>
+      )}
+    </div>
     </React.Fragment>
   );
-};
+
+}); // sortableBlock end
+
 
 const BlockEditor = () => {
   console.log("1. [blockEditor rendering ] ...  ");
+
+  const [activeId, setActiveId] = useState(null);
+
   useEffect(() => {
     console.log("2. [BlockEditor] mounted");
     
@@ -247,7 +254,7 @@ const BlockEditor = () => {
 
   const { blocks, setBlocks } = usePageContext();
   const displayedBlocks = useMemo(() => (Array.isArray(blocks) ? blocks : []), [blocks]);
-  
+
   // import useBlockEditor
   const {
     // state
@@ -256,6 +263,8 @@ const BlockEditor = () => {
     selectedCommandIndex, 
     focusedIndex, setFocusedIndex,
     hoveredIndex,
+    focusAndPlaceCaretEnd,
+    pendingFocusBidRef,
     // handlers
     handleInputChange, handleBlur, handleKeyDown, handleCommandSelect,
     handleChecklistToggle, handleDividerInsert,
@@ -294,6 +303,26 @@ const BlockEditor = () => {
     });
   }, [displayedBlocks, editorRefs]);
 
+
+// ────────────────────────────────────────────────────────────
+// 새 블록이 렌더링 되면 예약된 bid로 포커스를 1회 이동
+// ────────────────────────────────────────────────────────────
+useEffect(() => {
+  const bid = pendingFocusBidRef.current;
+  if (!bid) return; // 예약 없으면 즉시 종료
+
+  // 렌더 완료 프레임에서 안전하게 포커스
+  requestAnimationFrame(() => {
+    const el =
+      editorRefs.current[bid] ||
+      document.querySelector(`.editable[data-bid="${bid}"]`);
+    if (el) {
+      focusAndPlaceCaretEnd(el);
+      pendingFocusBidRef.current = null; // 1회성 처리
+    }
+  });
+}, [displayedBlocks, editorRefs, focusAndPlaceCaretEnd, pendingFocusBidRef]);
+
   // ────────────────────────────────────────────────────────────
   // Drag & Drop
   // ────────────────────────────────────────────────────────────
@@ -308,7 +337,10 @@ const BlockEditor = () => {
   }, [displayedBlocks]);
 
 
-  const handleDragStart = (event) => {};
+  const handleDragStart = (event) => {
+    const id = event?.active?.id;
+      if (id) setActiveId(id);
+    };
 
   const handleDragOver = (event) => {
     const { active, over } = event;
@@ -328,6 +360,7 @@ const BlockEditor = () => {
 
   const handleDragEnd = async (event) => {
     const { active, over } = event;
+    setActiveId(null);
     setOverId(null);
     setDropPosition(null);
 
@@ -365,6 +398,7 @@ const BlockEditor = () => {
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
+        collisionDetection={closestCenter}
         modifiers={[restrictToVerticalAxis]}
       >
         <SortableContext items={displayedBlocks.map((b) => b.bid)} strategy={verticalListSortingStrategy}>
@@ -430,6 +464,9 @@ const BlockEditor = () => {
             </React.Fragment>
           ))}
         </SortableContext>
+        <DragOverlay>
+          {activeId ? ( <div className="drag-overlay-ghost" /> ) : null}
+        </DragOverlay>
       </DndContext>
     </div>
   );

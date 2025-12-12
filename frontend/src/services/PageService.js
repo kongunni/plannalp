@@ -447,11 +447,30 @@ export const reorderBlocksBatch = async (orderedBids) => {
 
 /** [11] 콜아웃 */
 export const updateCallout = async (bid, patch /* {mode?, color?, iconId?} */) => {
-  const res = await apiRequest("put", `/block/callout`, { bid, ...patch });
+  const res = await apiRequest("patch", `/block/callout/${bid}`, patch);
   const block = res?.block ?? res ?? null;
   if (block && typeof block.meta === "string") block.meta = safeParse(block.meta);
   return block;
 };
+
+// export const updateCallout = async (bid, patch) => {
+//   try {
+//     const res = await apiRequest("patch", `/block/callout/${bid}`, patch);
+//     const block = res?.block ?? res ?? null;
+//     if (block && typeof block.meta === "string") block.meta = safeParse(block.meta);
+//     return block;
+//   } catch (e) {
+//     // 구(旧) PUT 엔드포인트가 남아있는 환경 대비
+//     const res2 = await apiRequest("put", `/block/callout`, { bid, ...patch });
+//     const block = res2?.block ?? res2 ?? null;
+//     if (block && typeof block.meta === "string") block.meta = safeParse(block.meta);
+//     return block;
+//   }
+// };
+
+
+
+
 
 
 /*

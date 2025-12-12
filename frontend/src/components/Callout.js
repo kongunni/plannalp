@@ -37,9 +37,17 @@ function pushRecent(mode, color) {
 // 스타일 적용
 function applyCalloutStyle(root, meta) {
   const m = meta?.callout || {};
-  const mode = m.mode === "text" ? "text" : "bg"; // 기본 bg
-  const color = m.color || "default";
+  const mode  = m.mode === "text" ? "text" : "bg";
+  const color = COLORS.includes(m.color) ? m.color : "default";
+
+  // 1) 기존 callout--* 클래스 깨끗하게 제거
+  [...root.classList].forEach(c => {
+    if (c.startsWith("callout--")) root.classList.remove(c);
+  });
+
+  // 2) 최신 상태로 부여
   root.classList.add(`callout--${mode}`, `callout--${color}`);
+  console.debug('co classes:', root.className);
 }
 
 // 표시 아이콘 계산
@@ -211,25 +219,9 @@ function buildIconPicker({ anchorEl, block, root, iconEl, setCalloutIcon }) {
   document.body.appendChild(pop);
 }
 
-
-
-
-
-/**
+/*
  * 콜아웃 블록 DOM 생성
- * @param {object} params
- *  - block: { bid, type: "callout", content: string }
- *  - index: number
- *  - handlers: {
- *      handleInputChange: (e, index) => void,
- *      handleKeyDown: (e, index) => void,
- *      handleBlur: (index, content) => Promise<void>,
- *      handleFocus: (e, index) => void,
- *      editorRefs: React.useRef / 일반 객체 (bid 키로 엘리먼트 저장),
- *    }
- * @returns {HTMLElement} root 엘리먼트(.block)
  */
-
 export function createCalloutBlock({ block, index, handlers }) {
   const {
     editorRefs,
@@ -265,8 +257,11 @@ export function createCalloutBlock({ block, index, handlers }) {
   editable.dataset.bid = block.bid;
   editable.dataset.type = "callout";
   editable.innerText = block.content || "";
-  editable.addEventListener('mousedown', (e) => e.stopPropagation());
-  editable.addEventListener('click', (e) => e.stopPropagation());
+
+  // 컨테이너 onclick 차단
+  editable.addEventListener('mousedown', (e) => e.stopPropagation(), { passive: false });
+  editable.addEventListener('click', (e) => e.stopPropagation(), { passive: false });
+  editable.addEventListener('pointerdown', (e) => e.stopPropagation(), { passive: false });
   
   if (typeof onCompositionStart === "function") {
    editable.addEventListener("compositionstart", onCompositionStart);

@@ -10,6 +10,25 @@ const router = express.Router();
 const COLORS = new Set(["default","gray","brown","orange","yellow","green","blue","purple","pink","red"]);
 const MODES  = new Set(["text","bg"]);
 
+// json 변환 (문자면 파싱, 객체면 그대로 반환)
+function ensureObject(v, fallback = {}) {
+  if (v == null) return fallback;
+
+  // 문자열이면 JSON.parse 시도
+  if (typeof v === "string") {
+    try {
+      return JSON.parse(v);
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  // 이미 객체면 그대로 반환
+  if (typeof v === "object") return v;
+
+  return fallback;
+}
+
 
 // [1] 페이지 이름 변경 API (사이드바 , 상세페이지)
 router.put("/pages/rename", async (req, res) => {
@@ -1102,50 +1121,117 @@ router.post("/block/reorder/batch", async (req, res) => {
 // ======================================================
 // [10] 콜아웃 블록 입력 수정
 // ======================================================
-router.put("/block/callout", async (req, res) => {
+// router.put("/block/callout", async (req, res) => {
+//   try {
+//     const { bid, mode, color, iconId } = req.body || {};
+//     if (!bid) return res.status(400).json({ ok: false, error: "bad request" });
+
+//     const [rows0] = await db.query("SELECT meta FROM nalp_schedule_block WHERE bid = ?", [bid]);
+//     const prevMeta = rows0?.[0]?.meta ? JSON.parse(rows0[0].meta) : {};
+//     const prevCO   = prevMeta.callout || {};
+
+//     const MODE_OK = (m) => m === "text" || m === "bg";
+//     const COLORS = new Set(["default","gray","brown","orange","yellow","green","blue","purple","pink","red"]);
+
+//     const nextCO = {
+//       mode  : MODE_OK(mode) ? mode : prevCO.mode,
+//       color : COLORS.has(color) ? color : prevCO.color,
+//       iconId: (Number.isInteger(iconId) && iconId >= 0 && iconId <= 9) ? iconId : prevCO.iconId,
+//     };
+
+
+//     const nextMeta = { ...prevMeta, callout: nextCO };
+
+//     await db.query(
+//       "UPDATE nalp_schedule_block SET meta = CAST(? AS JSON) WHERE bid = ?",
+//       [JSON.stringify(nextMeta), bid]
+//     );
+
+//     const [rows] = await db.query(
+//       "SELECT bid, type, content, meta, order_index, checked FROM nalp_schedule_block WHERE bid = ?",
+//       [bid]
+//     );
+
+//     const block = rows?.[0] || null;
+
+//     if (block?.meta && typeof block.meta === "string") {
+//       try { block.meta = JSON.parse(block.meta); } catch {}
+//     }
+//     res.json({ ok:true, block });
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ ok: false, error: "server error" });
+//   }
+// });
+
+
+
+// ======================================================
+// [11] 콜아웃 블록 수정
+// ======================================================
+router.patch('/block/callout/:bid', async (req, res) => {
   try {
-    const { bid, mode, color, iconId } = req.body || {};
-    if (!bid) return res.status(400).json({ ok: false, error: "bad request" });
+    const bid = Number(req.params.bid);
+    if (!Number.isFinite(bid) || bid <= 0) {
+      return res.status(400).json({ ok:false, error: 'bad request: invalid bid' });
+    }
 
-    const [rows0] = await db.query("SELECT meta FROM nalp_schedule_block WHERE bid = ?", [bid]);
-    const prevMeta = rows0?.[0]?.meta ? JSON.parse(rows0[0].meta) : {};
-    const prevCO   = prevMeta.callout || {};
+    // 입력값
+    let { mode, color, iconId } = req.body || {};
 
+    // 검증 로직(옵션 입력만 교정)
     const MODE_OK = (m) => m === "text" || m === "bg";
     const COLORS = new Set(["default","gray","brown","orange","yellow","green","blue","purple","pink","red"]);
 
-    const nextCO = {
-      mode  : MODE_OK(mode) ? mode : prevCO.mode,
-      color : COLORS.has(color) ? color : prevCO.color,
-      iconId: (Number.isInteger(iconId) && iconId >= 0 && iconId <= 9) ? iconId : prevCO.iconId,
+    if (mode !== undefined && !MODE_OK(mode)) mode = undefined;
+    if (color !== undefined && !COLORS.has(color)) color = undefined;
+    if (iconId !== undefined) {
+      iconId = Number(iconId);
+      if (!Number.isInteger(iconId) || iconId < 0 || iconId > 9) iconId = undefined;
+    }
+
+    // 기존 meta 로드
+    const [rows] = await db.query(
+      'SELECT meta FROM nalp_schedule_block WHERE bid=?',
+      [bid]
+    );
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ ok:false, error:'block not found' });
+    }
+
+    const currentMeta = ensureObject(rows[0]?.meta, {});
+    const nextMeta = {
+      ...currentMeta,
+      callout: {
+        ...(currentMeta.callout || {}),
+        ...(mode   !== undefined ? { mode }   : {}),
+        ...(color  !== undefined ? { color }  : {}),
+        ...(iconId !== undefined ? { iconId } : {}),
+      }
     };
 
-
-    const nextMeta = { ...prevMeta, callout: nextCO };
-
+    // JSON 컬럼이면 CAST(? AS JSON) 권장
     await db.query(
-      "UPDATE nalp_schedule_block SET meta = CAST(? AS JSON) WHERE bid = ?",
+      'UPDATE nalp_schedule_block SET meta = CAST(? AS JSON) WHERE bid = ?',
       [JSON.stringify(nextMeta), bid]
     );
 
-    const [rows] = await db.query(
-      "SELECT bid, type, content, meta, order_index, checked FROM nalp_schedule_block WHERE bid = ?",
+    // 갱신된 블록 반환(프론트 즉시 동기화 용)
+    const [rows2] = await db.query(
+      'SELECT bid, type, content, meta, order_index, checked FROM nalp_schedule_block WHERE bid=?',
       [bid]
     );
-
-    const block = rows?.[0] || null;
-
-    if (block?.meta && typeof block.meta === "string") {
+    const block = rows2?.[0] || null;
+    if (block && typeof block.meta === 'string') {
       try { block.meta = JSON.parse(block.meta); } catch {}
     }
-    res.json({ ok:true, block });
+
+    return res.json({ ok:true, block, meta: block?.meta || nextMeta });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ ok: false, error: "server error" });
+    console.error('[callout patch error]', err);
+    return res.status(500).json({ ok:false, error:'server error' });
   }
 });
-
-
 
 
 /* ----------------------------------- */
