@@ -14,8 +14,9 @@ const useBlockEditor = (blocks, setBlocks ) => {
 
   const draftRef = useRef({}); // { [bid]: string } 콜아웃 전용 드래프트
   const saveTimerRef = useRef({}); // { [bid]: number } 디바운스 타이머
-  const enterOnceRef = useRef(false); //엔터 판정용
   const composingRef = useRef(false); //IME 판정용
+  const enterOnceRef = useRef(false); //엔터 판정용
+  const isAddingBlockRef = useRef(false); // 블럭 추가 중복 방지
 
   const [focusedIndex, setFocusedIndex] = useState(null); // 드롭다운 포커스
   const [inputValue, setInputValue] = useState("");
@@ -64,11 +65,23 @@ const getBlockClass = (type) => {
 
 
 
-
-
 /* ==========================================
  *                   공통함수  
    ========================================== */
+
+const resolveIndex = (index, e) => {
+  // 1) e가 있으면 data-bid 우선
+  const bidStr = e?.currentTarget?.dataset?.bid;
+  const bid = bidStr ? Number(bidStr) : NaN;
+  if (Number.isFinite(bid)) {
+    const i = blocks.findIndex(b => b.bid === bid);
+    return i; // 못 찾으면 -1
+  }
+  // 2) fallback: 기존 index가 범위 안이면 사용
+  if (Number.isInteger(index) && index >= 0 && index < blocks.length) return index;
+  return -1;
+};
+
 // 순서재정렬 
 const sortByOrder = (arr = []) => {
   return [...arr].sort((a, b) => {
@@ -82,6 +95,7 @@ const sortByOrder = (arr = []) => {
   });
 };
 
+// 블록 정렬 후 상태 반영
 const normalizeAndSetBlocks = useCallback((next) => {
   // next가 함수(updater)든 배열이든 처리
   if (typeof next === "function") {
@@ -100,7 +114,6 @@ const getSafeRange = (rootEl) => {
   return range;
 };
 
-
 // 텍스트 정규화 (br제거)
 const normalizeText = (text) => (text || "")
                                             .replace(/\u200B/g, "")   // zero-width space
@@ -108,21 +121,19 @@ const normalizeText = (text) => (text || "")
                                             .trim();
 
 // 비어있는 텍스트 감지
-const isVisuallyEmpty = (el) => {
-  if (!el) return true;
-  const text = normalizeText(el.innerText || "");
-  return text.length === 0;
-};
-
+// const isVisuallyEmpty = (el) => {
+//   if (!el) return true;
+//   const text = normalizeText(el.innerText || "");
+//   return text.length === 0;
+// };
 
 // 보이는 문자만 남기기
-const stripInvisible = (s = "") =>
-  (s || "")
-    .replace(/[\u200B\u200C\u200D\uFEFF\u00A0]/g, "")
+const stripInvisible = (s) =>
+  (s ?? "")
+    .replace(/[\u200B\u200C\u200D\uFEFF]/g, "")
     .replace(/&nbsp;|&#160;/gi, "")
-    .replace(/\r?\n/g, "")
+    .replace(/\r/g, "")
     .trim();
-  
 
 // caret 뒤에 실질 텍스트/요소가 남아있는지(끝인지)
 const isCaretAtEnd = (rootEl) => {
@@ -139,8 +150,6 @@ const isCaretAtEnd = (rootEl) => {
   return txt.length === 0;
 };
 
-
-
 //오프셋 기반으로 안정화
 const getCurrentLineText = (el) => {
   if (!el) return "";
@@ -148,11 +157,9 @@ const getCurrentLineText = (el) => {
   if (!sel || sel.rangeCount === 0) return "";
   const r = sel.getRangeAt(0);
   if (!el.contains(r.startContainer)) return "";
-
   // 커서까지의 가시 텍스트 길이
   const offset = getCaretTextOffset(el); // 이미 가지고 계신 함수
   const full = el.innerText || "";
-
   // 현재 줄 시작 인덱스(없으면 0)
   const lineStart = full.lastIndexOf("\n", Math.max(0, offset - 1)) + 1;
   // 현재 줄 텍스트 = [줄 시작 ~ 커서]
@@ -160,23 +167,26 @@ const getCurrentLineText = (el) => {
   return stripInvisible(line);
 };
 
-// 🔧 블록 끝 판정은 유지(이름만 더 명확히)
+// 커서가 블록 끝에 있는지
 const isCaretAtBlockEnd = (el) => isCaretAtEnd(el);
 
-// 🆕 커서 뒤 텍스트(가시 기준) 확인 유틸
-const getAfterText = (el) => {
-  const sel = window.getSelection?.();
-  if (!el || !sel || sel.rangeCount === 0) return "";
-  const r = sel.getRangeAt(0);
-  if (!el.contains(r.endContainer)) return "";
+// 커서 뒤 텍스트(가시 기준) 확인 유틸
+// const getAfterText = (el) => {
+//   const sel = window.getSelection?.();
+//   if (!el || !sel || sel.rangeCount === 0) return "";
+//   const r = sel.getRangeAt(0);
+//   if (!el.contains(r.endContainer)) return "";
 
-  const pre = document.createRange();
-  pre.selectNodeContents(el);
-  pre.setStart(r.endContainer, r.endOffset);
-  return stripInvisible(pre.toString());
-};
+//   const pre = document.createRange();
+//   pre.selectNodeContents(el);
+//   pre.setStart(r.endContainer, r.endOffset);
+//   return stripInvisible(pre.toString());
+// };
 
-// =====// =====// =====// =====// =====// =====// =====
+
+/*
+ * 블록 업데이트 유틸
+ */
 
 // 블록 타입 & 콘텐츠 업데이트 (서버 및 상태 동시 업데이트)
 const updateTypeAndContent = async (bid, index, type, content="") => {
@@ -218,19 +228,10 @@ const calculateOrderIndex = async (index) => {
 
 
 // 리인덱싱 후 전체 Fetch처리
-// const safeAddBlock = async (type = "text", content = "", order_index, checked) => {
-//   const result = await addBlock(type, content, order_index, checked);
-//   if (result?.reloadedBlocks) {
-//     const block = result.reloadedBlocks.findIndex((b) => b.bid === result.bid) || null;
-//     return { block, reloadedBlocks: result.reloadedBlocks};
-//   }
-//   return { block: result ?? null, reloadedBlocks: null };
-// };
 const safeAddBlock = async (type = "text", content = "", order_index, checked) => {
   const result = await addBlock(type, content, order_index, checked);
   if (result?.reloadedBlocks && result?.bid != null) {
     const list = sortByOrder(result.reloadedBlocks);
-    // const list = [...result.reloadedBlocks].sort((a,b) => (a.order_index ?? 0) - (b.order_index ?? 0));
     const newBlock = list.find(b => b.bid === result.bid) || null;
     return { block: newBlock, reloadedBlocks: list };
   }
@@ -258,11 +259,6 @@ const insertTextBlockAfter = async (index) => {
       const after  = prev.slice(index + 1);
       return [...before, newBlock, ...after]; 
     });
-    // setBlocks(prev => {
-    //   const before = prev.slice(0, index + 1);
-    //   const after  = prev.slice(index + 1);
-    //   return sortByOrder([...before, newBlock, ...after]);
-    // });
   }
   pendingFocusBidRef.current = newBlock.bid;
   return newBlock;
@@ -330,23 +326,6 @@ const insertChecklistAfter = async (index) => {
 };
 
 // 텍스트 블록 추가 : 더블엔터 시 처리 : 토글, 인용, 콜아웃 등
-// const insertTextBlockAfter = async(index) => {
-//   const newOrder = await calculateOrderIndex(index);
-//   const { block: newBlock, reloadedBlocks } = await safeAddBlock("text", "", newOrder);
-//   if (!newBlock) return null;
-  
-//   if (reloadedBlocks) {
-//     setBlocks(reloadedBlocks);
-//   } else {
-//     setBlocks(prev => {
-//       const before = prev.slice(0, index + 1);
-//       const after  = prev.slice(index + 1);
-//       return [...before, newBlock, ...after];
-//     });
-//   }
-//   pendingFocusBidRef.current = newBlock.bid;
-//   return newBlock;
-// }; 
 
 // 콜아웃 외곽 클릭 시 포커스
 const handleCalloutContainerClick = (e, index) => {
@@ -407,11 +386,6 @@ const debounceUpdateContent = (bid, value, delay = 2000) => {
       delete saveTimerRef.current[bid];
     }
   }, delay);
-//  if (saveTimeout.current) clearTimeout(saveTimeout.current);
-//   saveTimeout.current = setTimeout(() => {
-//     const bid = blocks[index]?.bid;
-//     if (bid) updateBlockContent(bid, value).catch(console.error);
-//   }, delay);
 };
 
 /* ==========================================
@@ -421,7 +395,6 @@ const debounceUpdateContent = (bid, value, delay = 2000) => {
 const getCaretTextOffset = (rootEl) => {
   const range = getSafeRange(rootEl);
   if (!range) return 0;
-
   // text 시작부터 커서까지 길이 구하기
   const preRange = document.createRange();
   preRange.selectNodeContents(rootEl);
@@ -479,8 +452,10 @@ const focusBlockStart = (bid) => {
   sel.addRange(range);
 };
 
+// 편집기능 블록 인덱스 찾기
 const isEditableBlock = (b) => b && b.type !== "divider";
 
+// 이전 인덱스 찾기
 const findPrevEditableIndex = (from) => {
   for (let i = from - 1; i >= 0; i--) 
     if (isEditableBlock(blocks[i])) 
@@ -488,6 +463,7 @@ const findPrevEditableIndex = (from) => {
   return null;
 };
 
+// 다음 인덱스 찾기
 const findNextEditableIndex = (from) => {
   for (let i = from + 1; i < blocks.length; i++) 
     if (isEditableBlock(blocks[i])) return i;
@@ -552,8 +528,11 @@ const updateCommandPosition = () => {
   } catch (e) {}
 };
 
-//콜아웃
-//색 
+/* ===========================
+    콜아웃
+=========================== */
+
+//색상 설정 모드 
 const setCalloutColor = useCallback(async (index, mode, color) => {
   // 서버 업데이트
   const target = blocks?.[index];
@@ -574,7 +553,7 @@ const setCalloutColor = useCallback(async (index, mode, color) => {
   });
 }, [normalizeAndSetBlocks, blocks]);
  
- //아이콘 
+//아이콘 설정 모드
 const setCalloutIcon = useCallback(async (index, iconId) => {
   const target = blocks?.[index];
   if (!target || target.type !== "callout") return;
@@ -631,7 +610,7 @@ useEffect(() => {
   };
 }, [isCommandActive]);
 
-// blocks에 변화가 생길 때마다 문단의 끝 보정작업
+// 블록 변화 감지시 문단의 끝 보정작업
 useEffect(() => {
   appendAfterDivider();
 // eslint-disable-next-line 
@@ -687,6 +666,7 @@ const splitBlockAtCursor = async (index) => {
 };
 
 
+//  블록 복제
 const handleDuplicateBlock = async (index) => {
   const src = blocks[index];
   if (!src) return;
@@ -733,10 +713,7 @@ const handleDuplicateBlock = async (index) => {
 };
 
 
-
 /* ******************************************************** */
-
-
 /*
 *  드롭다운 명령어 포커스
 */
@@ -780,8 +757,15 @@ const handleFocus = (e, index) => {
  * 명령어 입력 감지, 블록 컨텐트 업데이트 
  */
 const handleInputChange = (e, index) => {
+  const idx = resolveIndex(index, e);
+  if (idx < 0) return;
+
+  // undefined 케이스 방지
+  const el = e?.currentTarget;
+  if (!el) return;
+
   const value = e.currentTarget.innerText;
-  const block = blocks[index];
+  const block = blocks[idx];
   if (!block) return;
   const bid = block.bid;
   const type = e.currentTarget.dataset.type || "text";
@@ -789,7 +773,7 @@ const handleInputChange = (e, index) => {
   // 2) 명령어 감지
   if (type === "text" && value.startsWith("/")) {
     setIsCommandActive(true); 
-    setFocusedIndex(index);
+    setFocusedIndex(idx);
     setFilteredCommands( blockCommands.filter((cmd) => cmd.label.startsWith(value)) );
     updateCommandPosition();
   } else {
@@ -799,14 +783,17 @@ const handleInputChange = (e, index) => {
 
   // 2) 콜아웃 드래프트 + 콜아웃용 디바운스 저장만
   if (type === "callout") {
+    const editable = e.currentTarget;
+    if (stripInvisible(editable.innerText) !== "" ) {
+      editable.dataset.lastEmptyEnter = "0";
+    }
+    
     draftRef.current[bid] = value;
-    const el = editorRefs.current[bid];
-    if (el) el.dataset.lastEmptyEnter = isVisuallyEmpty(el)? "1" : "0";
     debounceSaveCallout(bid, value);
     return; 
   }
   // 3) 그외 일반 블록 프론트 상태 업데이트 + bid기반 디바운스 저장
-  updateBlockLocally(index, { content: value });
+  updateBlockLocally(idx, { content: value });
   debounceUpdateContent(bid, value);
 };
 
@@ -871,9 +858,34 @@ const handleChecklistToggle = async (index, checked) => {
  *  키타입 감지
  */
 
+// 콜아웃 즉시 저장
+const flushCalloutNow = async (bid, el, idx) => {
+  const v = (el?.innerText ?? "").toString();
+
+  // 1) 콜아웃 저장 타이머 제거
+  if (saveTimerRef.current[bid]) {
+    clearTimeout(saveTimerRef.current[bid]);
+    delete saveTimerRef.current[bid];
+  }
+
+  // 2) 로컬 state 즉시 반영 (유령 방지 핵심)
+  updateBlockLocally(idx, { content: v });
+
+  // 3) 서버 즉시 반영
+  try {
+    await updateBlockContent(bid, v);
+  } catch (err) {
+    console.error("[flushCalloutNow] 서버 저장 실패", err);
+  }
+};
+
+
 // 키 처리
   const handleKeyDown = async (e, index) => {
-    const block = blocks[index];
+    const idx = resolveIndex(index, e);
+    if (idx < 0) return;
+
+    const block = blocks[idx];
     if (!block) return;
 
     const bid = block.bid;
@@ -900,6 +912,7 @@ const handleChecklistToggle = async (index, checked) => {
 
       return;
     }
+
     // 1) 드롭다운 활성: ↑/↓는 드롭다운 항목 이동
     if (isCommandActive) {
       if (["ArrowDown", "ArrowUp"].includes(e.key)) {
@@ -916,7 +929,7 @@ const handleChecklistToggle = async (index, checked) => {
         e.preventDefault();
         const cmd = filteredCommands[selectedCommandIndex];
         if (cmd) {
-          await handleCommandSelect(cmd, index);
+          await handleCommandSelect(cmd, idx);
           return;
         }
       }
@@ -927,7 +940,7 @@ const handleChecklistToggle = async (index, checked) => {
       const { atStart, atEnd, length } = getCaretOffsets(el);
 
       if (e.key === "ArrowUp" && (atStart || length === 0)) {
-        const prevIdx = findPrevEditableIndex(index);
+        const prevIdx = findPrevEditableIndex(idx);
         if (prevIdx !== null) {
           e.preventDefault();
           focusBlockEnd(blocks[prevIdx].bid);
@@ -935,7 +948,7 @@ const handleChecklistToggle = async (index, checked) => {
         }
       }
       if (e.key === "ArrowDown" && (atEnd || length === 0)) {
-        const nextIdx = findNextEditableIndex(index);
+        const nextIdx = findNextEditableIndex(idx);
         if (nextIdx !== null) {
           e.preventDefault();
           focusBlockStart(blocks[nextIdx].bid);
@@ -948,7 +961,8 @@ const handleChecklistToggle = async (index, checked) => {
     // 3) Backspace
     const selection = window.getSelection();
     const cursorPos = selection?.getRangeAt(0)?.startOffset ?? 0;
-    // const isEmpty = fullText.trim() === "";
+    
+    // 선택영역이 있으면 무시
     if (!getSafeRange(el)) {
       el.focus();
       const r = document.createRange();
@@ -968,35 +982,33 @@ const handleChecklistToggle = async (index, checked) => {
       if (type === "callout") {
         if (isEmpty) {
           e.preventDefault();
-          await handleBackspace(e, index);
+          await handleBackspace(e, idx);
           return;
         }
       }
 
-      // 2) 구분선: 맨 앞을 포커싱하고 있고 윗 블록이 구분선 블록일 떄 
-      if (cursorPos === 0 && index > 0 && blocks[index - 1]?.type === "divider") {
+      // 2) 구분선이 맨 앞을 포커싱하고 있고 윗 블록이 구분선 블록일 떄 삭제
+      if (cursorPos === 0 && idx > 0 && blocks[idx - 1]?.type === "divider") {
         e.preventDefault();
-        const dividerBid = blocks[index - 1].bid;
+        const dividerBid = blocks[idx - 1].bid;
         try {
           await deleteBlock(dividerBid);
           normalizeAndSetBlocks((prev) => prev.filter((b) => b.bid !== dividerBid));
         } catch (err) {
           console.error("[divider 삭제 실패] ", err);
         }
-        // await mergeWithPreviousBlock(index);
         return;
       }
 
       //3) 앞블록과 병합
-      if (cursorPos === 0 && fullText.trim() !== "" && index > 0) {
+      if (cursorPos === 0 && fullText.trim() !== "" && idx > 0) {
         e.preventDefault();
-        await mergeWithPreviousBlock(index);
+        await mergeWithPreviousBlock(idx);
         return;
       }
       // 4) 빈 블록 삭제
-      // if (fullText.trim() === "") {
       if (normalizeText(fullText).length === 0) {
-        handleBackspace(e, index);
+        handleBackspace(e, idx);
         return;
       }
     }
@@ -1004,152 +1016,139 @@ const handleChecklistToggle = async (index, checked) => {
     // 4) Enter
     if (e.key === "Enter") {
 
-      if (enterOnceRef.current) {
-        e.preventDefault();
+      /*
+       * shift + Enter 처리 
+       * 근데 현재 설계상 Shift+Enter는 줄바꿈이면 그냥 기본 브라우저 동작을 쓰는 편이 안전 --> 나중에 고쳐야지
+       */
+      if (e.shiftKey) {
+        if (type === "callout" || type === "toggle" || type === "quote") {
+          e.preventDefault();
+          
+          if (type === "callout") {
+            await flushCalloutNow(bid, el, idx);
+          }
+          await insertTextBlockAfter(idx);
+          return
+        }
+
+        // 2) 일반 텍스트: 줄바꿈 유지
+        if (type === "text") {
+          insertBreak(el);
+          debounceUpdateContent(bid, (el.innerText ?? ""));
+          return;
+        }
         return;
       }
-      enterOnceRef.current = true;
-      Promise.resolve().then(()=> { enterOnceRef.current = false; });
 
+      /*
+       * 기본 Enter 처리
+       */
+      e.preventDefault();
+      e.stopPropagation();
       
-      // ───────────────────────────────────────────────
-      // < Shift + Enter >로 줄바꿈 실행
-      // ───────────────────────────────────────────────
-      if(e.shiftKey) {
-         if (type === "callout" || type === "toggle" || type === "quote") {
-            e.preventDefault();
-            if (type === "callout") {
-              if (saveTimerRef.current[bid]) {
-                clearTimeout(saveTimerRef.current[bid]);  
-                delete saveTimerRef.current[bid];
-              }
-              try {
-                await updateBlockContent(bid, e.currentTarget.innerText);
-              } catch (error) {
-                console.error("[shift enter 실패]", error);
-              }
-            }
-            await insertTextBlockAfter(index);
-            return
-         }
-          // 2) 일반 텍스트: 줄바꿈 유지
-          if (type === "text") {
-            insertBreak(el);
-            debounceUpdateContent(bid, el.innerText);
+      // 이중처리 방지
+      if (enterOnceRef.current) return;
+      enterOnceRef.current = true;
+
+      // 블록 추가/분기 처리 락으로 잠금
+      if (isAddingBlockRef.current) {
+        setTimeout(() => { enterOnceRef.current = false; }, 0);
+        return;
+      }
+      isAddingBlockRef.current = true;
+      
+      try {
+        // 1) 콜아웃
+        if (type === "callout") {
+          const full = stripInvisible(el.innerText || "");
+          // 전체가 비어있으면 종료
+          if (full=== "") {
+            await flushCalloutNow(bid, el, idx); 
+            await insertTextBlockAfter(idx);
             return;
           }
-          return;
-      }
 
-      // ───────────────────────────────────────────────
-      // < Enter >만 실행
-      // ───────────────────────────────────────────────
-      // 1) 콜아웃
-      if (type === "callout") {
-        e.preventDefault();
+          // (B) 현재 줄이 비어있고 블록 끝에 포커싱 되어있을 때 탈출
+          const lineText = stripInvisible(getCurrentLineText(el));
 
-        const full = el.innerText || "";
-        const fullStripped = stripInvisible(full);
-
-        // (A) 전체가 비어있으면 종료
-        if (fullStripped === "") {
-          await insertTextBlockAfter(index);
-          return;
-        }
-
-        // 현재 줄/뒤쪽 텍스트 계산: 오프셋 기반
-        const lineText = getCurrentLineText(el);   // 현재 줄의 (커서 앞) 가시 텍스트
-        const afterText = getAfterText(el);        // 커서 뒤의 가시 텍스트
-        const atBlockEnd = isCaretAtBlockEnd(el);  // 블록 전체 기준 끝 여부
-
-        // 1) "<br>로 시작" == 현재 줄의 (커서 앞) 가시 텍스트가 빈 문자열
-        const lineStartsWithBr = (lineText === "");
-        // 2) "끝에 아무 텍스트도 없음" == 커서 뒤 가시 텍스트가 없음(= 블록 끝)
-        const nothingAfter = (afterText === "") || atBlockEnd;
-
-        // 1. <br>로 시작 + 끝에 아무 텍스트도 없으면 → 콜아웃 종료
-        if (lineStartsWithBr && nothingAfter) {
-          await insertTextBlockAfter(index);
-          return;
-        }
-
-        // 2. <br>로 시작하지만 뒤에(혹은 커서 뒤) 텍스트가 하나라도 있으면 → 내부 줄바꿈 삽입
-        //    (띄어쓰기 포함이므로 stripInvisible 기준으로 비/유 판단)
-        if (lineStartsWithBr && afterText !== "") {
+          if (lineText === "") {
+            await flushCalloutNow(bid, el, idx);
+            await insertTextBlockAfter(idx);
+            return;
+          }
+          
+          // 아니면 내부 줄바꿈
           insertBreak(el);
           debounceSaveCallout(bid, el.innerText, 2000);
           return;
-        }
-        // 3. 그 외 일반 케이스 → 내부 줄바꿈 삽입
-        insertBreak(el);
-        debounceSaveCallout(bid, el.innerText, 2000);
-        return;
-      }
+        } // if end
 
-      // 2) 토글 
-      if (["toggle", "quote"].includes(type)) {
-        const fullText = el.innerText || "";
-        const plain = fullText.replace(/\n/g, "").trim();
-        const isEmptyText = el.dataset.lastEmptyEnter === "1";
+        // 2) 토글 
+        if (["toggle", "quote"].includes(type)) {
+          const fullText = el.innerText || "";
+          const plain = fullText.replace(/\n/g, "").trim();
+          const isEmptyText = el.dataset.lastEmptyEnter === "1";
 
-        if (isEmptyText && plain === "") {
-          // 더블엔터: 종료
-          e.preventDefault();
-          el.dataset.lastEmptyEnter = "0";
-          await insertTextBlockAfter(index);
-          return;
-        } 
-        el.dataset.lastEmptyEnter = plain === "" ? "1" : "0";
-        // 싱글 엔터: 같은 블록 내부 줄바꿈
-        e.preventDefault();
-        return;
-      }
+          if (isEmptyText && plain === "") {
+            // 더블엔터: 종료
+            // e.preventDefault();
+            el.dataset.lastEmptyEnter = "0";
+            await insertTextBlockAfter(idx);
+            return;
+          } 
 
-      // 3) 체크리스트
-      if (type === "checklist") {
-        e.preventDefault();
-        
-        const fullText = el.innerText || "";
-        const plain = fullText.replace(/\n/g, "").trim();
-        const isEmptyText = el.dataset.lastEmptyEnter === "1";
-
-        
-        // 1) 내용 있는 상태에서 Enter : 새 항목 추가
-        if ( plain !== "") {
-          await updateBlockContent(bid, fullText.trim());
-          el.dataset.lastEmptyEnter = "0";
-          await insertChecklistAfter(index);
+          el.dataset.lastEmptyEnter = plain === "" ? "1" : "0";
+          // 싱글 엔터: 같은 블록 내부 줄바꿈
+          // e.preventDefault();
           return;
         }
 
-        // 2) 더블 엔터: 빈 줄에서  Enter
-        if (isEmptyText) {
-          el.dataset.lastEmptyEnter = "0";
-          await updateTypeAndContent(bid, index, "text", "");
-          requestAnimationFrame(() => {
-            const current = editorRefs.current[bid];
-            current && focusAndPlaceCaretEnd(current);
-          });
+        // 3) 체크리스트
+        if (type === "checklist") {
+          // e.preventDefault();
+          const fullText = el.innerText || "";
+          const plain = fullText.replace(/\n/g, "").trim();
+          const isEmptyText = el.dataset.lastEmptyEnter === "1";
+          
+          // 1) 내용 있는 상태에서 Enter : 새 항목 추가
+          if ( plain !== "") {
+            await updateBlockContent(bid, fullText.trim());
+            el.dataset.lastEmptyEnter = "0";
+            await insertChecklistAfter(idx);
+            return;
+          }
+
+          // 2) 더블 엔터: 빈 줄에서  Enter
+          if (isEmptyText) {
+            el.dataset.lastEmptyEnter = "0";
+            await updateTypeAndContent(bid, idx, "text", "");
+            requestAnimationFrame(() => {
+              const current = editorRefs.current[bid];
+              current && focusAndPlaceCaretEnd(current);
+            });
+            return;
+          }
+          // 3) 그 외: 첫번째 빈 엔터 플래그세팅
+          el.dataset.lastEmptyEnter = "1";
           return;
         }
-        // 3) 그 외: 첫번째 빈 엔터 플래그세팅
-        el.dataset.lastEmptyEnter = "1";
-        return;
-      }
 
-      // 4) 제목
-      if (["title1", "title2", "title3"].includes(type)) {
-        e.preventDefault();
-        await insertTextBlockAfter(index);
-        return;
-      }
+        // 4) 제목
+        if (["title1", "title2", "title3"].includes(type)) {
+          await insertTextBlockAfter(idx);
+          return;
+        }
 
-      // 5) 나머지 일반 텍스트 블록: 커서 기준으로 블록 split
-      e.preventDefault();
-      await splitBlockAtCursor(index);
+        // 5) 나머지 일반 텍스트 블록: 커서 기준으로 블록 split
+        await splitBlockAtCursor(idx);
+        return;
+
+      } finally {
+        setTimeout(() => { enterOnceRef.current = false; }, 0);
+        isAddingBlockRef.current = false;
+      }
     }
   };
-
 
 
 // 기존 블럭 수정 (명령어 선택 시 블록 타입 변경 + 서버 반영)
@@ -1200,25 +1199,43 @@ const handleCommandSelect = async (cmd, index) => {
 const handleBackspace = async (e, index) => {
   const block = blocks[index];
   const bid = block.bid;
+
+  // 블록이 하나 남았을 때는 삭제하지 않고 초기화
   if (blocks.length === 1) {
     await updateTypeAndContent(bid, index, "text", "");
-    // 마지막 하나 남으면 초기화만
     normalizeAndSetBlocks([{ ...block, type: "text", content: "" }]);
     return;
   }
-  // 그 외는 그냥 삭제
+  // 2) 삭제 전에 포커스 넘겨줄 대상의 bid 계산
+  const prevIdx = (() => {
+    for (let i = index - 1; i >= 0; i--) {
+      const b = blocks[i];
+      if (b && b.type !== "divider") return i;
+    }
+    return null;
+  })();
+  const prevBid = prevIdx != null ? blocks[prevIdx].bid : null;
+
+  // 3) 서버 삭제
   await deleteBlock(bid);
-  const updated = blocks.filter((_, i) => i !== index);
-  normalizeAndSetBlocks(updated);
-    requestAnimationFrame(() => {
-      const prev = document.querySelector(
-        `.block:nth-child(${index}) .editable`
-      );
-      if (prev) {
-          focusAndPlaceCaretEnd(prev)
-      }
-    });
-  };
+
+  // 4) 로컬 상태에서 해당 bid 제거 + 정렬
+  normalizeAndSetBlocks((prev) => prev.filter((b) => b.bid !== bid));
+  
+  // 5) 다음 프레임에서 prevBid 기준으로 포커스 이동
+  requestAnimationFrame(() => {
+    if (!prevBid) return;
+
+    const el =
+      editorRefs.current[prevBid] ||
+      document.querySelector(`.editable[data-bid="${prevBid}"]`);
+
+    if (el) {
+      focusAndPlaceCaretEnd(el);
+    }
+  });
+ 
+};
 
   // 병합 : 현재 블록을 바로 앞의 블록과 합침 (두 블록을 하나로 합쳐 업데이트)
   const mergeWithPreviousBlock = async (currentIndex) => {
@@ -1241,13 +1258,17 @@ const handleBackspace = async (e, index) => {
     normalizeAndSetBlocks(updated);
 
     // 3) 화면에 즉시 병합된 내용 반영
-    requestAnimationFrame(() => {
-      const targetEl = editorRefs.current[currentIndex - 1];
-      if (targetEl) {
-        targetEl.innerText = mergedContent;
-        focusAndPlaceCaretEnd(targetEl);
-      }
-    });
+  requestAnimationFrame(() => {
+    const prevBid = previous.bid;
+    const targetEl =
+      editorRefs.current[prevBid] ||
+      document.querySelector(`.editable[data-bid="${prevBid}"]`);
+
+    if (targetEl) {
+      targetEl.innerText = mergedContent;
+      focusAndPlaceCaretEnd(targetEl);
+    }
+  });
   };
 
   /*
@@ -1269,6 +1290,8 @@ const handleBackspace = async (e, index) => {
 
       // 3)
       const { block: textBlock, reloadedBlocks } = await safeAddBlock("text", "", textOrder);
+    
+
       if (!textBlock) return;
       if (reloadedBlocks) {
         normalizeAndSetBlocks(reloadedBlocks);

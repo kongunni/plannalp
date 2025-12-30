@@ -68,7 +68,9 @@ const SortableBlock = React.memo(function SortableBlock({
 
     const host = calloutRef.current;
     if (!host) return;
-    host.innerHTML = ""; // 기존 DOM 제거
+
+    delete editorRefs.current[bid];
+    host.innerHTML = "";
 
     const blockForDom = { bid, type, content, meta };
     // 새 DOM 생성
@@ -183,7 +185,7 @@ const SortableBlock = React.memo(function SortableBlock({
                 suppressContentEditableWarning
                 data-type={block.type}
                 data-bid={block.bid}
-                ref={(el) => { if (el) editorRefs.current[block.bid] = el; }}
+                ref={(el) => { if (el) editorRefs.current[block.bid] = el;  else delete editorRefs.current[block.bid]; }}
                 onInput={(e) => handleInputChange(e, index)}
                 onFocus={(e) => handleFocus(e, index)}
                 onBlur={(e) => handleBlur(index, e.currentTarget.innerText)}
@@ -220,7 +222,7 @@ const SortableBlock = React.memo(function SortableBlock({
             suppressContentEditableWarning
             data-type={block.type}
             data-bid={block.bid}
-            ref={(el) => { if (el) editorRefs.current[block.bid] = el; }}
+            ref={(el) => { if (el) editorRefs.current[block.bid] = el;  else delete editorRefs.current[block.bid];}}
             onInput={(e) => handleInputChange(e, index)}
             onFocus={(e) => handleFocus(e, index)}
             onBlur={(e) => handleBlur(index, e.currentTarget.innerText)}
@@ -295,7 +297,12 @@ const BlockEditor = () => {
       if (b.type === "callout") return;
 
       const el = editorRefs.current[b.bid];
-      if (!el) return;
+
+      if (!el || !document.body.contains(el)) {
+        delete editorRefs.current[b.bid];
+        return;
+      }
+
       if (document.activeElement === el) return;
 
       const next = (b.content ?? "").toString();

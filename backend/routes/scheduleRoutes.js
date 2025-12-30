@@ -587,9 +587,6 @@ async function reindexBlocks(conn) {
     );
     newIndex += step;
   }
-    //  `UPDATE nalp_schedule_block 
-    //       SET order_index = ?, updated_at = CURRENT_TIMESTAMP
-    //     WHERE bid = ?`,
   console.log("[server] reindexBlocks completed...");
 }
 
@@ -656,8 +653,15 @@ router.get("/block/:bid", async (req, res) => {
  *   type 필수, content 기본 "", checked 기본 false
  */
 router.post("/block", async (req, res) => {
-  // const { type, content = "", order_index } = req.body;
-  const { type, content = "", order_index, checked } = req.body;
+  const { 
+          type, 
+          content = "", 
+          order_index, 
+          checked, 
+          parent_bid, 
+          depth, 
+          meta 
+        } = req.body;
 
   if (!type) return res.status(400).json({ error: "type은 필수입니다." });
 
@@ -667,38 +671,47 @@ router.post("/block", async (req, res) => {
   try {
     await conn.beginTransaction();
 
+    const parentBid = normalizeParentBid(parent_bid);
+    const depthVal  = normalizeDepth(depth);
+    const metaObj = ensureObject(meta, null);
+    const metaJson = metaObj ? JSON.stringify(metaObj) : null;
+
     let newOrderIndex = order_index;
 
     // order_index 없으면 맨뒤에 1000단위 간격으로 추가
     if (typeof newOrderIndex !== "number") {
       const [[{ maxOrder = 0 }]] = await conn.query(
-        `SELECT MAX(order_index) as maxOrder FROM nalp_schedule_block`
+        `SELECT MAX(order_index) as maxOrder 
+           FROM nalp_schedule_block
+           WHERE ${parentWhereSql()}`,
+        [parentBid]
       );
-      newOrderIndex = maxOrder + 1000;
+      newOrderIndex = (maxOrder || 0) + 1000;
     }
 
     // 간격 좁음 감지
-    // const [[prev], [next]] = await Promise.all([
     const [[prevRows], [nextRows]] = await Promise.all([
       conn.query(
         `
              SELECT order_index 
                FROM nalp_schedule_block 
-              WHERE order_index < ? 
+              WHERE ${parentWhereSql()} 
+                AND order_index < ? 
            ORDER BY order_index DESC 
               LIMIT 1
         `,
-        [newOrderIndex]
+        [parentBid, newOrderIndex]
       ),
       conn.query(
         `
             SELECT order_index 
               FROM nalp_schedule_block 
-             WHERE order_index > ? 
+             WHERE ${parentWhereSql()}
+               AND order_index > ? 
           ORDER BY order_index ASC 
              LIMIT 1
         `,
-        [newOrderIndex]
+        [parentBid, newOrderIndex]
       )
     ]);
 
@@ -715,37 +728,50 @@ router.post("/block", async (req, res) => {
       didReindex = true;
 
       // 리인덱싱 후 새 order_index 재계산
-      const [[{ maxOrder = 0 }]] = await conn.query(
-        `SELECT MAX(order_index) as maxOrder FROM nalp_schedule_block`
+     const [[{ maxOrder = 0 }]] = await conn.query(
+        `SELECT MAX(order_index) as maxOrder
+           FROM nalp_schedule_block
+          WHERE ${parentWhereSql()}`,
+        [parentBid]
       );
       // newOrderIndex = maxOrder + 1000;
       newOrderIndex = (maxOrder || 0) + 1000;
     }
 
-    // 블록 추가
-    // const [result] = await conn.query(
-    //   `INSERT INTO nalp_schedule_block (type, content, order_index) VALUES (?, ?, ?)`,
-    //   [type, content, newOrderIndex]
-    // );
-
     //블록 추가 (checked는 체크리스트 외 0으로 반영) 
     const checkedVal = Number(!!checked);
+    
     const [result] = await conn.query(
       `
-        INSERT INTO nalp_schedule_block (type, content, order_index, checked)
-             VALUES (?, ?, ?, ?)
+        INSERT INTO nalp_schedule_block
+          (type, content, meta, order_index, checked, parent_bid, depth)
+        VALUES
+          (?, ?, ${metaJson ? "CAST(? AS JSON)" : "NULL"}, ?, ?, ?, ?)
       `,
-      [type, content, newOrderIndex, checkedVal]
+      metaJson
+        ? [type, content, metaJson, newOrderIndex, checkedVal, parentBid, depthVal]
+        : [type, content,             newOrderIndex, checkedVal, parentBid, depthVal]
     );
+
+    // const [result] = await conn.query(
+    //   `
+    //     INSERT INTO nalp_schedule_block (type, content, order_index, checked)
+    //          VALUES (?, ?, ?, ?)
+    //   `,
+    //   [type, content, newOrderIndex, checkedVal]
+    // );
 
     await conn.commit();
     res.status(201).json({
       bid: result.insertId,
       type,
       content,
+      meta: metaObj,
       order_index: newOrderIndex,
       checked: checkedVal,
-      reindexed: didReindex, // 리인덱싱여부
+      parent_bid: parentBid,
+      depth: depthVal,
+      reindexed: didReindex,
     });
 
   } catch (err) {
@@ -817,12 +843,6 @@ router.put('/block/type', async (req, res) => {
     );
 
     // [2] checklist 타입이면 초기 항목 1개 생성
-    // if (type === "checklist") {
-    //   await conn.execute(
-    //     `INSERT INTO nalp_checklist (bid, content, order_index) VALUES (?, '', 1000)`,
-    //     [bid]
-    //   );
-    // }
 
     // [3] 블록 재조회하여 data로 반환
     const [rows] = await conn.execute(
@@ -1117,57 +1137,8 @@ router.post("/block/reorder/batch", async (req, res) => {
 });
 
 
-
 // ======================================================
-// [10] 콜아웃 블록 입력 수정
-// ======================================================
-// router.put("/block/callout", async (req, res) => {
-//   try {
-//     const { bid, mode, color, iconId } = req.body || {};
-//     if (!bid) return res.status(400).json({ ok: false, error: "bad request" });
-
-//     const [rows0] = await db.query("SELECT meta FROM nalp_schedule_block WHERE bid = ?", [bid]);
-//     const prevMeta = rows0?.[0]?.meta ? JSON.parse(rows0[0].meta) : {};
-//     const prevCO   = prevMeta.callout || {};
-
-//     const MODE_OK = (m) => m === "text" || m === "bg";
-//     const COLORS = new Set(["default","gray","brown","orange","yellow","green","blue","purple","pink","red"]);
-
-//     const nextCO = {
-//       mode  : MODE_OK(mode) ? mode : prevCO.mode,
-//       color : COLORS.has(color) ? color : prevCO.color,
-//       iconId: (Number.isInteger(iconId) && iconId >= 0 && iconId <= 9) ? iconId : prevCO.iconId,
-//     };
-
-
-//     const nextMeta = { ...prevMeta, callout: nextCO };
-
-//     await db.query(
-//       "UPDATE nalp_schedule_block SET meta = CAST(? AS JSON) WHERE bid = ?",
-//       [JSON.stringify(nextMeta), bid]
-//     );
-
-//     const [rows] = await db.query(
-//       "SELECT bid, type, content, meta, order_index, checked FROM nalp_schedule_block WHERE bid = ?",
-//       [bid]
-//     );
-
-//     const block = rows?.[0] || null;
-
-//     if (block?.meta && typeof block.meta === "string") {
-//       try { block.meta = JSON.parse(block.meta); } catch {}
-//     }
-//     res.json({ ok:true, block });
-//   } catch (err) {
-//     console.error(err);
-//     res.status(500).json({ ok: false, error: "server error" });
-//   }
-// });
-
-
-
-// ======================================================
-// [11] 콜아웃 블록 수정
+// [10] 콜아웃 블록 수정
 // ======================================================
 router.patch('/block/callout/:bid', async (req, res) => {
   try {
@@ -1235,14 +1206,57 @@ router.patch('/block/callout/:bid', async (req, res) => {
 
 
 /* ----------------------------------- */
-/*  체크리스트 API                        */
+/*  토글 API                        */
 /* ----------------------------------- */
-// [1] 체크리스트 조회 GET 
-// [ * ] 체크리스트 블록 리인덱싱: 순서재정렬
-// [* - 2 ] 리인덱싱 프론트
-//  [2] 체크리스트 항목 추가
-// [3] 체크리스트 수정
-//  [4] 체크리스트 삭제
-//  [5] 체크리스트 순서 재설정
+
+// parent_bid NULL-safe WHERE 구문 (NULL 비교 포함)
+function parentWhereSql() {
+  // parent_bid <=> ?  (NULL-safe equal)
+  return `parent_bid <=> ?`;
+}
+
+function normalizeParentBid(v) {
+  if (v === undefined) return undefined;
+  if (v === null || v === "" ) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function normalizeDepth(v) {
+  if (v === undefined) return undefined;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.floor(n));
+}
+
+// 부모 블록의 자식 블록 리인덱싱
+async function reindexBlocksByParent(conn, parentBid) {
+  console.log("[server] reindexBlocksByParent start.... parentBid=", parentBid);
+
+  const [blocks] = await conn.query(
+    `
+      SELECT bid
+        FROM nalp_schedule_block
+       WHERE ${parentWhereSql()}
+    ORDER BY order_index ASC
+    `,
+    [parentBid]
+  );
+
+  let newIndex = 1000;
+  const step = 1000;
+
+  for (const block of blocks) {
+    await conn.query(
+      `UPDATE nalp_schedule_block SET order_index = ? WHERE bid = ?`,
+      [newIndex, block.bid]
+    );
+    newIndex += step;
+  }
+
+  console.log("[server] reindexBlocksByParent completed...");
+}
+
+
 
 module.exports = router;
