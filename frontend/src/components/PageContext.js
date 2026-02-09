@@ -32,30 +32,21 @@ export const PageProvider = ({ children }) => {
             initOnceRef.current = true;
             try {
                 const latest = await fetchBlocks(); 
+
                 if (Array.isArray(latest) && latest.length > 0) {
-                setBlocks(latest);
-                return;
+                    setBlocks(latest);
+                    initOnceRef.current = true;
+                    return;
                 }
                 const firstBlock = await addBlock("text", "", 1000);
+                
                 if (firstBlock?.reloadedBlocks) setBlocks(firstBlock.reloadedBlocks);
                 else if (firstBlock) setBlocks([firstBlock]);
-            } finally {
-                // initOnceRef.current = true;  // 이미 true
-            }
-        // if (initGuardRef.current) return;
-        // initGuardRef.current = true;
-        // try {
-        //     const firstBlock = await addBlock("text", "", 1000);
-        //     if (firstBlock?.reloadedBlocks) {
-        //         setBlocks(firstBlock.reloadedBlocks);
-        //     } else if (firstBlock) {
-        //         setBlocks([firstBlock]);
-        //     } else {
 
-        //     }
-        // } finally {
-        //     initGuardRef.current = true;
-        // }
+                initOnceRef.current=true;
+            } catch (err) {
+                console.error("❌ [initializeContent] 실패:", err);
+            }
     }, []);
 
     /** 페이지 목록 불러오기 */

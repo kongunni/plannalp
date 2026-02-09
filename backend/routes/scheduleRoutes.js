@@ -590,6 +590,26 @@ async function reindexBlocks(conn) {
   console.log("[server] reindexBlocks completed...");
 }
 
+// 부모 bid 정규화: 정수이면서 1 이상이면 그대로, 아니면 null
+function normalizeParentBid(v) {
+  const n = Number(v);
+  if (Number.isInteger(n) && n > 0) return n;
+  return null;
+}
+
+// depth 정규화: 0 이상 정수 아니면 0으로
+function normalizeDepth(v) {
+  const n = Number(v);
+  if (Number.isInteger(n) && n >= 0) return n;
+  return 0;
+}
+
+function parentWhereSql() {
+  return "parent_bid <=> ?";
+}
+
+
+
 // [공통] 리인덱싱 API 라우터 (프론트 대응용)
 router.post("/block/reindex", async (req, res) => {
   const conn = await db.getConnection();
@@ -660,8 +680,8 @@ router.post("/block", async (req, res) => {
           checked, 
           parent_bid, 
           depth, 
-          meta 
-        } = req.body;
+          meta
+  } = req.body;
 
   if (!type) return res.status(400).json({ error: "type은 필수입니다." });
 
@@ -670,14 +690,29 @@ router.post("/block", async (req, res) => {
 
   try {
     await conn.beginTransaction();
-
     const parentBid = normalizeParentBid(parent_bid);
     const depthVal  = normalizeDepth(depth);
-    const metaObj = ensureObject(meta, null);
-    const metaJson = metaObj ? JSON.stringify(metaObj) : null;
+    
+    // meta 객체 보장
+    const typeRaw = req.body.type;
+    const typeNorm = (typeRaw ?? "").toString().trim();
+    let metaObj = ensureObject(req.body.meta, {});
+
+    // toggle 생성 시 기본값 주입
+    if (typeNorm === "toggle") {
+      metaObj.toggle = metaObj.toggle && typeof metaObj.toggle === "object" ? metaObj.toggle : {};
+      if (metaObj.toggle.collapsed == null) metaObj.toggle.collapsed = 1;
+    }
+    console.log("[server] typeRaw:", JSON.stringify(typeRaw), "typeNorm:", typeNorm);
+    
+    const metaJson = JSON.stringify(metaObj);
+    console.log("[server] metaObj:", metaObj);
+
+    /* 
+       order_index 재계산 
+     */
 
     let newOrderIndex = order_index;
-
     // order_index 없으면 맨뒤에 1000단위 간격으로 추가
     if (typeof newOrderIndex !== "number") {
       const [[{ maxOrder = 0 }]] = await conn.query(
@@ -741,30 +776,32 @@ router.post("/block", async (req, res) => {
     //블록 추가 (checked는 체크리스트 외 0으로 반영) 
     const checkedVal = Number(!!checked);
     
-    const [result] = await conn.query(
-      `
-        INSERT INTO nalp_schedule_block
-          (type, content, meta, order_index, checked, parent_bid, depth)
-        VALUES
-          (?, ?, ${metaJson ? "CAST(? AS JSON)" : "NULL"}, ?, ?, ?, ?)
-      `,
-      metaJson
-        ? [type, content, metaJson, newOrderIndex, checkedVal, parentBid, depthVal]
-        : [type, content,             newOrderIndex, checkedVal, parentBid, depthVal]
-    );
+    const sql = `
+      INSERT INTO nalp_schedule_block
+        (type, content, meta, order_index, checked, parent_bid, depth)
+      VALUES
+        (?, ?, CAST(? AS JSON), ?, ?, ?, ?)
+    `;
 
-    // const [result] = await conn.query(
-    //   `
-    //     INSERT INTO nalp_schedule_block (type, content, order_index, checked)
-    //          VALUES (?, ?, ?, ?)
-    //   `,
-    //   [type, content, newOrderIndex, checkedVal]
-    // );
+    const params = [
+      typeNorm,
+      content,
+      metaJson,
+      newOrderIndex,
+      checkedVal,
+      parentBid,
+      depthVal
+    ];
+
+    console.log("[server] INSERT sql:", sql);
+    console.log("[server] INSERT params:", params);
+    const [result] = await conn.query(sql, params);
 
     await conn.commit();
+
     res.status(201).json({
       bid: result.insertId,
-      type,
+      type: typeNorm,
       content,
       meta: metaObj,
       order_index: newOrderIndex,
@@ -773,6 +810,8 @@ router.post("/block", async (req, res) => {
       depth: depthVal,
       reindexed: didReindex,
     });
+
+    console.log("[server] PUT /block/type body:", req.body);
 
   } catch (err) {
     await conn.rollback();
@@ -821,12 +860,12 @@ router.put("/block/content", async (req, res) => {
  */
 router.put('/block/type', async (req, res) => {
   const { bid, type } = req.body;
-  // console.log("🔥 [PUT /block/type] req.body:", req.body);
-  // console.log("✅ [PUT /block/type] 요청 수신:", { bid, type });
 
   if (!bid || !type) {
     return res.status(400).json({ error: "bid, type은 필수입니다." });
   }
+
+  console.log("[toggle 확인을 위한 로그] PUT /block/type body:", req.body);
 
   const conn = await db.getConnection();
 
@@ -836,13 +875,24 @@ router.put('/block/type', async (req, res) => {
     // [1] 타입 업데이트
     await conn.execute(
       `UPDATE nalp_schedule_block 
-          SET type = ? 
-             , updated_at = CURRENT_TIMESTAMP
+          SET type = ?, updated_at = CURRENT_TIMESTAMP
         WHERE bid = ?`,
       [type, bid]
     );
 
-    // [2] checklist 타입이면 초기 항목 1개 생성
+    // [2] toggle일경우 meta.toggle.collapsed 기본값 세팅
+    if (type === "toggle") {
+      await conn.execute(
+        `UPDATE nalp_schedule_block
+            SET meta = JSON_SET(
+                COALESCE(meta, JSON_OBJECT()),
+                '$.toggle.collapsed',
+                COALESCE(JSON_EXTRACT(COALESCE(meta, JSON_OBJECT()), '$.toggle.collapsed'), 1)
+          )
+         WHERE bid = ?`,
+        [bid]
+      );
+    }
 
     // [3] 블록 재조회하여 data로 반환
     const [rows] = await conn.execute(
@@ -1209,54 +1259,93 @@ router.patch('/block/callout/:bid', async (req, res) => {
 /*  토글 API                        */
 /* ----------------------------------- */
 
-// parent_bid NULL-safe WHERE 구문 (NULL 비교 포함)
-function parentWhereSql() {
-  // parent_bid <=> ?  (NULL-safe equal)
-  return `parent_bid <=> ?`;
-}
 
-function normalizeParentBid(v) {
-  if (v === undefined) return undefined;
-  if (v === null || v === "" ) return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
+// ─────────────────────────────────────────────
+// 토글 접힘 상태 변경
+// PATCH /schedule/block/:bid/collapsed
+// body: { collapsed: true/false }
+// ─────────────────────────────────────────────
+router.patch("/block/toggle/:bid", async (req, res) => {
+  const bid = Number(req.params.bid);
+  const { collapsed } = req.body;
 
-function normalizeDepth(v) {
-  if (v === undefined) return undefined;
-  const n = Number(v);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.floor(n));
-}
-
-// 부모 블록의 자식 블록 리인덱싱
-async function reindexBlocksByParent(conn, parentBid) {
-  console.log("[server] reindexBlocksByParent start.... parentBid=", parentBid);
-
-  const [blocks] = await conn.query(
-    `
-      SELECT bid
-        FROM nalp_schedule_block
-       WHERE ${parentWhereSql()}
-    ORDER BY order_index ASC
-    `,
-    [parentBid]
-  );
-
-  let newIndex = 1000;
-  const step = 1000;
-
-  for (const block of blocks) {
-    await conn.query(
-      `UPDATE nalp_schedule_block SET order_index = ? WHERE bid = ?`,
-      [newIndex, block.bid]
-    );
-    newIndex += step;
+  if (!Number.isInteger(bid) || bid <= 0) {
+    return res
+      .status(400)
+      .json({ success: false, message: "유효하지 않은 bid 입니다." });
   }
 
-  console.log("[server] reindexBlocksByParent completed...");
-}
+  // true / 1 / "1" → 접힘(1), 나머지는 0
+  const collapsedBool =
+    collapsed === true || collapsed === 1 || collapsed === "1";
+  const collapsedInt = collapsedBool ? 1 : 0;
 
+  const conn = await db.getConnection();
+  try {
+    // 해당 블록이 존재하는지 + 토글 타입인지 확인
+    const [rows] = await conn.query(
+      `
+      SELECT bid, type, meta
+        FROM nalp_schedule_block
+       WHERE bid = ?
+      `,
+      [bid]
+    );
+
+    if (rows.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "블록을 찾을 수 없습니다." });
+    }
+
+    const block = rows[0];
+    if (block.type !== "toggle") {
+      // 토글 아닌 블록도 허용하고 싶으면 이 if 문 제거
+      return res
+        .status(400)
+        .json({ success: false, message: "토글 타입 블록이 아닙니다." });
+    }
+
+    // meta.toggle.collapsed 업데이트
+    await conn.query(
+      `
+      UPDATE nalp_schedule_block
+         SET meta = JSON_SET(
+               COALESCE(meta, JSON_OBJECT()),
+               '$.toggle.collapsed',
+               ?
+             )
+       WHERE bid = ?
+      `,
+      [collapsedInt, bid]
+    );
+
+    // 갱신된 블록 다시 조회해서 응답
+    const [updatedRows] = await conn.query(
+      `
+      SELECT bid, parent_bid, depth, type, content, meta, order_index, checked,
+             created_at, updated_at
+        FROM nalp_schedule_block
+       WHERE bid = ?
+      `,
+      [bid]
+    );
+
+    const updated = updatedRows[0];
+
+    return res.json({
+      success: true,
+      block: updated,
+    });
+  } catch (err) {
+    console.error("[PATCH /block/toggle/:bid] error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "서버 오류", error: err.message });
+  } finally {
+    conn.release();
+  }
+});
 
 
 module.exports = router;

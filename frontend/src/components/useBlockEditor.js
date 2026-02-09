@@ -2,8 +2,26 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { 
         addBlock, updateBlockContent, deleteBlock, updateBlockType, 
         fetchBlocks, reindexBlocks, toggleBlockChecked,
-        updateCallout
+        updateCallout, 
+        updateToggleCollapsed
         } from "../services/PageService";
+
+// 메타 파싱 유틸
+function safeParseMeta(v) {
+  if (v == null) return {};
+  if (typeof v === "object") return v;
+  if (typeof v === "string") {
+    const s = v.trim();
+    if (!s) return {};
+    try {
+      const parsed = JSON.parse(s);
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
 
 const useBlockEditor = (blocks, setBlocks ) => {
   // const isAddingBlock = useRef(false); // 블럭위치
@@ -27,6 +45,7 @@ const useBlockEditor = (blocks, setBlocks ) => {
   const [commandPos, setCommandPos] = useState({ top: 0, left: 0 }); // 드롭다운
 
   
+
 // const saveTimeout = useRef(null); // 입력 감지시 자동저장
 
   const blockCommands = [
@@ -64,23 +83,125 @@ const getBlockClass = (type) => {
 };
 
 
+// 토글 접기 상태 확인 (판별용) : blockEditor 내부에서 1회 호출
+const isToggleCollapsed = useCallback((block) => {
+  if (!block || block.type !== "toggle") return false;
+  const meta = safeParseMeta(block.meta);
+  const v = meta?.toggle?.collapsed;
+  return v === true || v === 1 || v === "1";
+}, []);
+
+// bid로 토글 접기/열림 상태 확인 
+const setToggleCollapsedByBid = useCallback(async (bid) => {
+  if (!bid) return;
+
+  let prevCollapsed = null;
+  let nextCollapsed = null;
+
+  // 1) 낙관적 업데이트 + 현재값 계산 prev에서 해결
+  setBlocks(prev => {
+    const cur = prev.find(b => Number(b.bid) === Number(bid));
+    if (!cur || cur.type !== "toggle") return prev;
+
+    const meta = safeParseMeta(cur.meta);
+    const curr =
+      meta?.toggle?.collapsed === true ||
+      meta?.toggle?.collapsed === 1 ||
+      meta?.toggle?.collapsed === "1";
+
+    prevCollapsed = curr;
+    nextCollapsed = !curr;
+
+    return prev.map(b => {
+      if (Number(b.bid) !== Number(bid)) return b;
+
+      const m = safeParseMeta(b.meta);
+      return {
+        ...b,
+        meta: {
+          ...(m || {}),
+          toggle: {
+            ...((m || {}).toggle || {}),
+            collapsed: nextCollapsed ? 1 : 0,
+          },
+        },
+      };
+    });
+  });
+
+  // prevCollapsed가 null이면 (토글 못 찾음) 종료
+  if (prevCollapsed == null || nextCollapsed == null) return;
+
+  // 2) 서버 반영
+  try {
+    const updated = await updateToggleCollapsed(bid, nextCollapsed);
+    if (!updated) throw new Error("toggle patch returned null");
+
+    // meta 문자열 파싱/정규화 후 반영
+    const normalized = (() => {
+      const u = { ...updated };
+      if (typeof u.meta === "string") {
+        try { u.meta = JSON.parse(u.meta); } catch { u.meta = {}; }
+      }
+      if (!u.meta || typeof u.meta !== "object") u.meta = {};
+      if (u.type === "toggle") {
+        u.meta.toggle = u.meta.toggle || {};
+        if (u.meta.toggle.collapsed == null) u.meta.toggle.collapsed = nextCollapsed ? 1 : 0;
+      }
+      return u;
+    })();
+
+    setBlocks(prev =>
+      prev.map(b => (Number(b.bid) === Number(bid) ? { ...b, ...normalized } : b))
+    );
+  } catch (e) {
+    console.error("[setToggleCollapsedByBid] failed, rollback", e);
+
+    // 3) 롤백
+    setBlocks(prev =>
+      prev.map(b => {
+        if (Number(b.bid) !== Number(bid)) return b;
+        const m = safeParseMeta(b.meta);
+        return {
+          ...b,
+          meta: {
+            ...(m || {}),
+            toggle: {
+              ...((m || {}).toggle || {}),
+              collapsed: prevCollapsed ? 1 : 0,
+            },
+          },
+        };
+      })
+    );
+  }
+}, [setBlocks, updateToggleCollapsed]); 
+
 
 /* ==========================================
  *                   공통함수  
    ========================================== */
-
 const resolveIndex = (index, e) => {
-  // 1) e가 있으면 data-bid 우선
   const bidStr = e?.currentTarget?.dataset?.bid;
   const bid = bidStr ? Number(bidStr) : NaN;
-  if (Number.isFinite(bid)) {
-    const i = blocks.findIndex(b => b.bid === bid);
-    return i; // 못 찾으면 -1
-  }
-  // 2) fallback: 기존 index가 범위 안이면 사용
-  if (Number.isInteger(index) && index >= 0 && index < blocks.length) return index;
-  return -1;
+
+  if (!Number.isFinite(bid)) return -1;
+  const i = blocks.findIndex(b => Number(b.bid) === bid);
+  return i;
 };
+
+// const resolveIndex = (index, e) => {
+//   // 1) e가 있으면 data-bid 우선
+//   const bidStr = e?.currentTarget?.dataset?.bid;
+//   const bid = bidStr ? Number(bidStr) : NaN;
+//   if (Number.isFinite(bid)) {
+//     const i = blocks.findIndex(b => b.bid === bid);
+//     return i; // 못 찾으면 -1
+//   }
+//   // 2) fallback: 기존 index가 범위 안이면 사용
+//   if (Number.isInteger(index) && index >= 0 && index < blocks.length) return index;
+//   return -1;
+// };
 
 // 순서재정렬 
 const sortByOrder = (arr = []) => {
@@ -121,11 +242,6 @@ const normalizeText = (text) => (text || "")
                                             .trim();
 
 // 비어있는 텍스트 감지
-// const isVisuallyEmpty = (el) => {
-//   if (!el) return true;
-//   const text = normalizeText(el.innerText || "");
-//   return text.length === 0;
-// };
 
 // 보이는 문자만 남기기
 const stripInvisible = (s) =>
@@ -192,9 +308,16 @@ const isCaretAtBlockEnd = (el) => isCaretAtEnd(el);
 const updateTypeAndContent = async (bid, index, type, content="") => {
   await updateBlockType(bid, type);
   await updateBlockContent(bid, content);
-  const updated = [ ...blocks ];
-  updated[index] = { ...updated[index], type, content };
-  normalizeAndSetBlocks(updated);
+  normalizeAndSetBlocks(prev => {
+    if (!Array.isArray(prev)) return prev;
+    if (index < 0 || index >= prev.length) return prev;
+    const next = [...prev];
+    next[index] = { ...next[index], type, content };
+    return next;
+  });
+  // const updated = [ ...blocks ];
+  // updated[index] = { ...updated[index], type, content };
+  // normalizeAndSetBlocks(updated);
 };
 
 // setBlocks 로컬 상태 업데이트 
@@ -226,33 +349,131 @@ const calculateOrderIndex = async (index) => {
   return newOrder;
 };
 
+// 리인덱싱 : 토글 자식 블록 추가용
+const calculateOrderIndexForToggleChild = async (toggleIndex) => {
+  const parent = blocks[toggleIndex];
+  if (!parent || parent.type !== "toggle") return null;
+
+  const parentBid = parent.bid;
+
+  // 같은 parent_bid를 가진 자식들만 추출
+  const children = blocks.filter(b => Number(b.parent_bid) === Number(parentBid));
+
+  // 자식이 아예 없으면: "토글 바로 다음"에 오도록 order 계산
+  // -> next는 toggleIndex+1의 order를 쓰되, 그게 토글 자식이든 아니든 상관없이 "토글 다음"을 기준으로 잡음
+  if (children.length === 0) {
+    const prevOrder = parent.order_index ?? 1000;
+    const nextOrder = blocks[toggleIndex + 1]?.order_index ?? prevOrder + 1000;
+    let newOrder = Number(((prevOrder + nextOrder) / 2).toFixed(6));
+
+    if (nextOrder - prevOrder < 0.0001) {
+      console.warn("⚠️ 간격 부족 → 리인덱싱 시도");
+      await reindexBlocks();
+      const refreshed = await fetchBlocks();
+      normalizeAndSetBlocks(refreshed);
+
+      const refreshedParent = refreshed.find(b => Number(b.bid) === Number(parentBid));
+      const parentOrder = refreshedParent?.order_index ?? 1000;
+
+      // refreshed에서 parent의 index를 다시 찾아야 함
+      const parentIdx = refreshed.findIndex(b => Number(b.bid) === Number(parentBid));
+      const refreshedNext = refreshed[parentIdx + 1]?.order_index ?? parentOrder + 1000;
+
+      newOrder = Number(((parentOrder + refreshedNext) / 2).toFixed(6));
+    }
+
+    return newOrder;
+  }
+
+  // 자식이 있으면: 마지막 자식 뒤에 붙임
+  const lastChildOrder = Math.max(...children.map(c => Number(c.order_index ?? 0)));
+  return Number((lastChildOrder + 1000).toFixed(6));
+};
+
+
 
 // 리인덱싱 후 전체 Fetch처리
-const safeAddBlock = async (type = "text", content = "", order_index, checked) => {
-  const result = await addBlock(type, content, order_index, checked);
+const safeAddBlock = async ({
+  type = "text",
+  content = "",
+  order_index,
+  checked,
+  parent_bid = null,
+  depth = 0,
+  meta = null,
+} = {}) => {
+  const pickBlock = (res) => {
+    const b = res?.block ?? res?.data ?? res ?? null;
+    if (!b || typeof b !== "object") return null;
+    if (b.bid == null) return null;
+    return b;
+  };
+
+  const normalizeMeta = (b) => {
+    if (!b) return b;
+    const next = { ...b };
+
+    // 모든 타입 공통
+    if (typeof next.meta === "string") {
+      try { next.meta = JSON.parse(next.meta); }
+      catch { next.meta = {}; }
+    }
+    if (next.meta == null || typeof next.meta !== "object") next.meta = {};
+
+    // 토글 전용
+    if (next.type === "toggle") {
+      next.meta.toggle = next.meta.toggle || {};
+      if (next.meta.toggle.collapsed == null) next.meta.toggle.collapsed = 1;
+    }
+    return next;
+  };
+
+  // toggle 생성시 meta 기본값 자동 주입
+  const metaForCreate =
+    type === "toggle"
+      ? {
+          ...(meta || {}),
+          toggle: { ...((meta || {})?.toggle || {}), collapsed: ((meta || {})?.toggle?.collapsed ?? 1) },
+        }
+      : meta;
+  const result = await addBlock(type, content, order_index, checked, parent_bid, depth, metaForCreate);
+
+  // reindex로 전체 fetch가 온 케이스
   if (result?.reloadedBlocks && result?.bid != null) {
-    const list = sortByOrder(result.reloadedBlocks);
-    const newBlock = list.find(b => b.bid === result.bid) || null;
+    const list = sortByOrder(result.reloadedBlocks).map(normalizeMeta);
+
+    const createdBid =
+      result?.bid ??
+      pickBlock(result)?.bid ??
+      null;
+
+    const newBlock = list.find((b) => Number(b.bid) === Number(createdBid)) || null;
+
     return { block: newBlock, reloadedBlocks: list };
   }
-  const newBlock = result?.block ?? result ?? null;
+
+  // 단일 블록만 온 케이스
+  let newBlock = normalizeMeta(pickBlock(result));
+
+  // order_index 폴백
   if (newBlock && order_index != null && newBlock.order_index == null) {
     newBlock.order_index = order_index;
   }
+
   return { block: newBlock, reloadedBlocks: null };
 };
 
 // ================================================
 // 블록 추가후 처리
 // ================================================
-
 const insertTextBlockAfter = async (index) => {
+
   const newOrder = await calculateOrderIndex(index);
-  const { block: newBlock, reloadedBlocks } = await safeAddBlock("text", "", newOrder);
+  const { block: newBlock, reloadedBlocks } = await safeAddBlock({ type: "text", content: "", order_index: newOrder });
   if (!newBlock) return null;
 
   if (reloadedBlocks) {
-    normalizeAndSetBlocks(reloadedBlocks); // 이미 정렬됨
+    normalizeAndSetBlocks(reloadedBlocks);
   } else {
     normalizeAndSetBlocks(prev => { 
       const before = prev.slice(0, index + 1);
@@ -263,6 +484,70 @@ const insertTextBlockAfter = async (index) => {
   pendingFocusBidRef.current = newBlock.bid;
   return newBlock;
 };
+
+const insertTextBlockAfterToggleGroup = async (childIdx) => {
+  const child = blocks[childIdx];
+  const parentBid = child?.parent_bid;
+  if (!parentBid) return insertTextBlockAfter(childIdx);
+
+  // 부모 토글 찾기
+  const parentIdx = blocks.findIndex(b => Number(b.bid) === Number(parentBid));
+  if (parentIdx < 0) return insertTextBlockAfter(childIdx);
+
+  // 부모 토글의 마지막 자식 인덱스 찾기(연속 depth 기반)
+  const parentDepth = Number(blocks[parentIdx]?.depth ?? 0);
+  let lastIdx = parentIdx;
+
+  for (let i = parentIdx + 1; i < blocks.length; i++) {
+    const d = Number(blocks[i]?.depth ?? 0);
+    if (d <= parentDepth) break;
+    lastIdx = i;
+  }
+
+  // 토글 그룹 끝(lastIdx) 뒤에 텍스트 삽입
+  return insertTextBlockAfter(lastIdx);
+};
+
+
+
+// 토글 내부에 텍스트 블록 추가 
+const insertToggleChildText = async (toggleBid) => {
+  const toggleIndex = blocks.findIndex(b => Number(b.bid) === Number(toggleBid));
+  if (toggleIndex < 0) return null;
+
+  const toggle = blocks[toggleIndex];
+  const toggleDepth = Number.isFinite(Number(toggle.depth)) ? Number(toggle.depth) : 0;
+
+  const order_index = await calculateOrderIndexForToggleChild(toggleIndex); 
+
+  console.log("[toggle-child] addBlock payload:", {
+    type: "text",
+    parent_bid: toggleBid,
+    depth: toggleDepth + 1,
+    order_index,
+  });
+
+  const { block: childBlock, reloadedBlocks } = await safeAddBlock({
+    type: "text",
+    content: "",
+    order_index,
+    parent_bid: toggleBid,
+    depth: toggleDepth + 1,
+    meta: { role: "toggle-content" },
+  });
+
+  if (reloadedBlocks) normalizeAndSetBlocks(reloadedBlocks);
+  else if (childBlock) {
+    normalizeAndSetBlocks(prev => {
+      const before = prev.slice(0, toggleIndex + 1);
+      const after = prev.slice(toggleIndex + 1);
+      return [...before, childBlock, ...after];
+    });
+  }
+
+  return childBlock;
+};
+
 
 // 콜아웃, 토글, 인용 등 사용 : 줄바꿈 <br>
 const insertBreak = (el) => {
@@ -290,21 +575,6 @@ const insertBreak = (el) => {
   sel.addRange(range);
 };
 
-// const insertBreak = (el) => {
-//   const range = getSafeRange(el);
-//   if (!range) return;
-
-//   const br = document.createElement("br");
-  
-//   // 커서 포커싱
-//   range.insertNode(br);
-//   range.setStartAfter(br);
-//   range.collapse(true);
-
-//   const sel = window.getSelection();
-//   sel.removeAllRanges();
-//   sel.addRange(range);
-// };
 
 // 체크리스트 : 엔터시 새 항목 추가
 const insertChecklistAfter = async (index) => {
@@ -595,6 +865,9 @@ const debounceSaveCallout = useCallback((bid, value, delay = 500) => {
 }, [normalizeAndSetBlocks]);
 
 
+/*
+ * 드래프트 관리
+*/
 // 외부에서 필요하면 드래프트 조회
 const getDraftContent = useCallback((bid) => draftRef.current[bid] ?? null, []);
 
@@ -615,6 +888,7 @@ useEffect(() => {
   appendAfterDivider();
 // eslint-disable-next-line 
 }, [blocks]);
+
 
 // 문단나누기 : 블록분리, 이어쓰기, 명령후 이어쓰기 등 사용
 const splitBlockAtCursor = async (index) => {
@@ -767,8 +1041,10 @@ const handleInputChange = (e, index) => {
   const value = e.currentTarget.innerText;
   const block = blocks[idx];
   if (!block) return;
+
   const bid = block.bid;
-  const type = e.currentTarget.dataset.type || "text";
+  // const type = e.currentTarget.dataset.type || "text";
+  const type = el.dataset.type || block.type || "text";
 
   // 2) 명령어 감지
   if (type === "text" && value.startsWith("/")) {
@@ -777,13 +1053,16 @@ const handleInputChange = (e, index) => {
     setFilteredCommands( blockCommands.filter((cmd) => cmd.label.startsWith(value)) );
     updateCommandPosition();
   } else {
+    // 명령어 슬래쉬가 아니거나 text 이외의 블록이면 항상 명령어 닫기
     setIsCommandActive(false); // 명령어 드롭다운 닫기
     setFilteredCommands([]);
   }
 
   // 2) 콜아웃 드래프트 + 콜아웃용 디바운스 저장만
   if (type === "callout") {
-    const editable = e.currentTarget;
+    // const editable = e.currentTarget;
+    const editable = el;
+
     if (stripInvisible(editable.innerText) !== "" ) {
       editable.dataset.lastEmptyEnter = "0";
     }
@@ -792,6 +1071,7 @@ const handleInputChange = (e, index) => {
     debounceSaveCallout(bid, value);
     return; 
   }
+
   // 3) 그외 일반 블록 프론트 상태 업데이트 + bid기반 디바운스 저장
   updateBlockLocally(idx, { content: value });
   debounceUpdateContent(bid, value);
@@ -858,6 +1138,8 @@ const handleChecklistToggle = async (index, checked) => {
  *  키타입 감지
  */
 
+
+
 // 콜아웃 즉시 저장
 const flushCalloutNow = async (bid, el, idx) => {
   const v = (el?.innerText ?? "").toString();
@@ -879,6 +1161,12 @@ const flushCalloutNow = async (bid, el, idx) => {
   }
 };
 
+// 토글 판별용
+const isToggleContentBlock = (b) => {
+  if (!b) return false;
+  const meta = safeParseMeta(b.meta);
+  return meta?.role === "toggle-content";
+};
 
 // 키 처리
   const handleKeyDown = async (e, index) => {
@@ -889,7 +1177,8 @@ const flushCalloutNow = async (bid, el, idx) => {
     if (!block) return;
 
     const bid = block.bid;
-    const type = block.type;
+    // const type = block.type;
+    const type = e.currentTarget.dataset.type || block.type || "text";
     const el = e.currentTarget;
 
     if (e.isComposing || composingRef.current) return;
@@ -1015,7 +1304,6 @@ const flushCalloutNow = async (bid, el, idx) => {
 
     // 4) Enter
     if (e.key === "Enter") {
-
       /*
        * shift + Enter 처리 
        * 근데 현재 설계상 Shift+Enter는 줄바꿈이면 그냥 기본 브라우저 동작을 쓰는 편이 안전 --> 나중에 고쳐야지
@@ -1058,54 +1346,139 @@ const flushCalloutNow = async (bid, el, idx) => {
       isAddingBlockRef.current = true;
       
       try {
-        // 1) 콜아웃
+        // 1) 콜아웃 
         if (type === "callout") {
+            const full = stripInvisible(el.innerText || "");
+            const lineText = stripInvisible(getCurrentLineText(el));
+            const isCallout = (type === "callout");
+
+            // 1) 저장 함수
+            const saveFunc = async () => {
+              if (isCallout) {
+                await flushCalloutNow(bid, el, idx);
+              } else {
+                debounceUpdateContent(bid, el.innerText, 0);
+              }
+            };
+
+            // 2) 줄바꿈 후 저장
+            const saveAfterBreak = () => {
+              if (isCallout) {
+                debounceSaveCallout(bid, el.innerText, 2000);
+              } else {
+                debounceUpdateContent(bid, el.innerText);
+              }
+            };
+
+             // 3) 블록 전체가 비어있을 때 Enter: 토글/콜아웃 탈출 + 아래 텍스트 블록 추가 및 포커싱
+            if (full === "") {
+              await saveFunc();
+              await insertTextBlockAfter(idx);
+              return;
+            }
+
+            // (2) 현재 줄이 빈 줄일 때 Enter: 더블엔터
+            if (lineText === "") {
+              await saveFunc();
+              await insertTextBlockAfter(idx);
+              return;
+            }
+
+            // (3) 그 외 → 내부 줄바꿈
+            insertBreak(el);
+            saveAfterBreak();
+            return;
+        }
+
+        // 2) 토글
+        if (type === "toggle") {
+          const fullText = stripInvisible(el.innerText || "");
+          
+          if (fullText === "") {
+
+            
+            const toggleBlock = blocks[idx];
+            // A) 헤더 비어있을 때, 엔터 : 자식 생성/포커스
+            if (isToggleCollapsed(toggleBlock)){
+              await setToggleCollapsedByBid(bid); // 펼치기
+            }
+            // B) 자식이 있으면 있는 자식 포커스
+            const next = blocks[idx + 1];
+            const isChild = next 
+            && Number(next.parent_bid) === Number(bid)
+            && Number(next.depth) === Number(toggleBlock.depth) + 1;
+            // 포커스 이동
+            if (isChild) {
+              pendingFocusBidRef.current = next.bid;
+              return;
+            }
+            // C) 자식이 없으면 생성 후 포커스 예약
+            const childBlock = await insertToggleChildText(bid);
+            if (childBlock?.bid) 
+              pendingFocusBidRef.current = childBlock.bid; 
+            return;
+          }
+        }
+
+        // 2.5) 토글 콘텐츠
+        if (type === "text" && isToggleContentBlock(block)) {
           const full = stripInvisible(el.innerText || "");
-          // 전체가 비어있으면 종료
-          if (full=== "") {
-            await flushCalloutNow(bid, el, idx); 
-            await insertTextBlockAfter(idx);
+          const lineText = stripInvisible(getCurrentLineText(el));
+
+          // 저장: 일반 텍스트라 debounce 0으로
+          const saveFunc = async () => {
+            debounceUpdateContent(bid, el.innerText, 0);
+          };
+
+          const saveAfterBreak = () => {
+            debounceUpdateContent(bid, el.innerText);
+          };
+
+          // (1) 블록 전체가 비었으면 토글 종료
+          if (full === "") {
+            await saveFunc();
+            await insertTextBlockAfterToggleGroup(idx);
             return;
           }
 
-          // (B) 현재 줄이 비어있고 블록 끝에 포커싱 되어있을 때 탈출
+          // (2) 현재 줄이 빈 줄이면 더블엔터로 간주 -> 토글 종료 + 아래 새 텍스트
+          if (lineText === "") {
+            await saveFunc();
+            await insertTextBlockAfterToggleGroup(idx);
+            return;
+          }
+
+          // (3) 그 외: 내부 줄바꿈
+          insertBreak(el);
+          saveAfterBreak();
+          return;
+        }
+          
+        // 3) 인용
+        if (type === "quote") {
+          const fullText = stripInvisible(el.innerText || "");
           const lineText = stripInvisible(getCurrentLineText(el));
 
-          if (lineText === "") {
-            await flushCalloutNow(bid, el, idx);
+          // 1) 전체가 비어있을 때 Enter : 인용 탈출 + 아래 텍스트 블록 추가 및 포커싱
+          if (fullText === "") {
             await insertTextBlockAfter(idx);
             return;
           }
           
-          // 아니면 내부 줄바꿈
-          insertBreak(el);
-          debounceSaveCallout(bid, el.innerText, 2000);
-          return;
-        } // if end
-
-        // 2) 토글 
-        if (["toggle", "quote"].includes(type)) {
-          const fullText = el.innerText || "";
-          const plain = fullText.replace(/\n/g, "").trim();
-          const isEmptyText = el.dataset.lastEmptyEnter === "1";
-
-          if (isEmptyText && plain === "") {
-            // 더블엔터: 종료
-            // e.preventDefault();
-            el.dataset.lastEmptyEnter = "0";
+          // 2) 현재 줄이 빈 줄일 때 Enter: 더블엔터
+          if (lineText === "") {
             await insertTextBlockAfter(idx);
             return;
-          } 
+          }
 
-          el.dataset.lastEmptyEnter = plain === "" ? "1" : "0";
-          // 싱글 엔터: 같은 블록 내부 줄바꿈
-          // e.preventDefault();
+          // 3) 그 외 → 내부 줄바꿈
+          insertBreak(el);
+          debounceUpdateContent(bid, el.innerText);
           return;
         }
 
-        // 3) 체크리스트
+        // 4) 체크리스트
         if (type === "checklist") {
-          // e.preventDefault();
           const fullText = el.innerText || "";
           const plain = fullText.replace(/\n/g, "").trim();
           const isEmptyText = el.dataset.lastEmptyEnter === "1";
@@ -1153,13 +1526,20 @@ const flushCalloutNow = async (bid, el, idx) => {
 
 // 기존 블럭 수정 (명령어 선택 시 블록 타입 변경 + 서버 반영)
 const handleCommandSelect = async (cmd, index) => {
-  console.log("[handleCommandSelect] 1 진입. 명령어: ", cmd, "index:", index);
-
+  // console.log("[handleCommandSelect] 1 진입. 명령어: ", cmd, "index:", index);
   const block = blocks[index];
   const bid = block.bid;
   const el = bid ? editorRefs.current[bid] : null ;
   if (!block || !bid || !el) return;
 
+  // el.innerText = "";
+  // 해당 bid의 디바운스 저장 예약이 있으면 취소 ("/"가 서버로 저장되는 걸 차단)
+  if (saveTimerRef.current[bid]) {
+    clearTimeout(saveTimerRef.current[bid]);
+    delete saveTimerRef.current[bid];
+  }
+  // 로컬/DOM 둘 다 즉시 비우기
+  updateBlockLocally(index, { content: "" });
   el.innerText = "";
   closeCommandDropdown();
 
@@ -1179,7 +1559,23 @@ const handleCommandSelect = async (cmd, index) => {
     case "title2":
     case "title3":
     case "callout":
-    case "toggle":
+    case "toggle": {
+      el.innerText = "";
+      // 로컬 반영
+      updateBlockLocally(index, { 
+        type: "toggle",
+        content: "",
+        meta: { ...(safeParseMeta(block.meta) || {}), toggle: { collapsed: 1 } },
+      });
+      // 서버 반영
+      await updateTypeAndContent(bid, index, "toggle", "");
+      // 서버 접힘 상태 저장 collapsed: 1
+      await updateToggleCollapsed(bid, true);
+      // 포커스 이동
+      const headerEl = editorRefs.current[bid];
+      headerEl && focusAndPlaceCaretEnd(headerEl);
+      return;
+    }
     case "quote":
     case "text":
     default: {
@@ -1288,11 +1684,10 @@ const handleBackspace = async (e, index) => {
       // 2) divider 바로 아래에 빈 text 블록 추가
       const textOrder = await calculateOrderIndex(index);
 
-      // 3)
+      // 3) 서버 반영
       const { block: textBlock, reloadedBlocks } = await safeAddBlock("text", "", textOrder);
-    
-
       if (!textBlock) return;
+
       if (reloadedBlocks) {
         normalizeAndSetBlocks(reloadedBlocks);
       } else {
@@ -1333,6 +1728,7 @@ const handleBackspace = async (e, index) => {
     isCommandActive, setIsCommandActive,
     filteredCommands, setFilteredCommands,
     selectedCommandIndex, setSelectedCommandIndex,
+    safeParseMeta,
     // handlers
     handleInputChange,
     handleBlur,
@@ -1359,6 +1755,10 @@ const handleBackspace = async (e, index) => {
     setCalloutColor,
     setCalloutIcon,
     getDraftContent,
+    // toggle 설정
+    isToggleCollapsed,
+    setToggleCollapsedByBid,
+    insertToggleChildText,
   };
 };
 export default useBlockEditor;

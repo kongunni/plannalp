@@ -848,8 +848,8 @@ Css 커스터마이징 하기 위해서는 :root로 설정된 내용을 변경�
   display: flex;
   position: absolute;
   align-items: center;
-  left: 8px;
-  top: 50%;
+  left: -5px;
+  top: 10px;
   transform: translateY(-50%);
   gap: 4px;
   z-index: 5;
@@ -907,7 +907,7 @@ Css 커스터마이징 하기 위해서는 :root로 설정된 내용을 변경�
 /* contentEditable 입력창 */
 .editable {
   min-height: 24px;
-  padding: 4px 2px;
+  /* padding: 4px 2px; */
   font-size: 16px;
   outline: none;
   border: none;
@@ -916,6 +916,7 @@ Css 커스터마이징 하기 위해서는 :root로 설정된 내용을 변경�
   white-space: pre-wrap;
   word-break: break-word;
 }
+
 .blockPlaceholder {
   position: absolute;
   top: 10px;
@@ -1223,10 +1224,77 @@ Css 커스터마이징 하기 위해서는 :root로 설정된 내용을 변경�
 .block-callout.callout--red     { --co-fg:#b91c1c;  --co-bg:rgba(185,28,28,.10); }
 
 
-
 /* ==============================
-  
+    토글 스타일 
 ============================== */
+
+
+.toggle-wrapper {
+  width: 100%;
+}
+
+.toggle-wrapper.collapsed .toggle-content {
+  display: none;
+}
+
+.toggle-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.toggle-caret {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px 6px;
+  line-height: 1.2;
+  user-select: none;
+}
+
+.toggle-header-editor {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.toggle-wrapper .editable {
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 20px;
+  padding: 2px 0;
+}
+
+/* placeholder가 contentEditable 위에 자연스럽게 보이게 */
+.toggle-header-editor .blockPlaceholder {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+
+/* toggle 자식부분  */
+[data-role="toggle-content"] .editable{
+  margin-left: 10px;
+  border-left: 2px solid rgba(0,0,0,0.08);
+  padding-left: 10px;
+}
+
+
+
+.block-quote {
+  border-left: 3px solid rgba(55,53,47,0.2);
+  padding-left: 12px;
+  color: #555;
+}
+
+
+
+/* ============================================================ */
 
 
 /* 푸터 */

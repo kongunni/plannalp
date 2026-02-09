@@ -32,7 +32,7 @@ const RootComponent = () => {
 
     useEffect(() => {
         console.log("🔥 darkMode 상태:", darkMode);
-         // 🔥 다크 모드 적용 로직 (기본값은 꺼져 있어야 함)
+         // 다크 모드 적용 로직 (기본값은 꺼져 있어야 함)
          if (darkMode) {
             document.body.classList.add("dark-mode");
             console.log("✅ dark-mode 클래스 추가됨");
@@ -41,14 +41,14 @@ const RootComponent = () => {
             console.log(" dark-mode 클래스 추가안됨");
         }
 
-        // 🔥 작은 텍스트 적용
+        // 작은 텍스트 적용
         if (smallText) {
             document.body.classList.add("small-text");
         } else {
             document.body.classList.remove("small-text");
         }
 
-        // 🔥 페이지 잠금 적용
+        // 페이지 잠금 적용
         const container = document.querySelector(".main-container");
         if (container) {
             if (pageLocked) {
@@ -58,13 +58,13 @@ const RootComponent = () => {
             }
         }
 
-        // 🔥 폰트 스타일 적용
+        // 폰트 스타일 적용
         document.body.style.fontFamily =
             fontStyle === "serif" ? "'Noto Serif KR', serif"
             : fontStyle === "mono" ? "Courier New, monospace"
             : "Arial, sans-serif";
 
-        // 🔥 로컬 스토리지에 값 저장
+        // 로컬 스토리지에 값 저장
         localStorage.setItem("darkMode", darkMode);
         localStorage.setItem("fontStyle", fontStyle);
         localStorage.setItem("smallText", smallText);

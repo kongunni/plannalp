@@ -33,27 +33,27 @@ export const apiRequest = async (method, endpoint, data = null) => {
     }
 };
 
-/** 🔥 [1] 페이지 목록 가져오기 */
+/*  [1] 페이지 목록 가져오기 */
 export const fetchPages = async (uid) => {
     if (!uid) return [];
     const response = await apiRequest("get", `/pages`, { uid }); 
     return response?.pages ?? [];
 };
 
-/** 🔥 [2] 스케줄 페이지 목록 가져오기 */
+/* [2] 스케줄 페이지 목록 가져오기 */
 export const fetchSchedulePages = async (uid) => {
     if (!uid) return [];
     return await apiRequest("get", `/schedules/pages?uid=${uid}`);
 };
 
-/** 🔥 [3] 특정 페이지 정보 가져오기 */
+/* [3] 특정 페이지 정보 가져오기 */
 export const fetchPageDetails = async (pid) => {
     if (!pid) return null;
     return await apiRequest("get", `/pages/${pid}`);
 };
 
 
-/** 🔥 [2] :pid 페이지의 일정 목록 가져오기 */
+/* [2] :pid 페이지의 일정 목록 가져오기 */
 export const fetchSchedulesByPage = async (uid, pid) => {
     if (!uid || !pid) return [];
     const response = await apiRequest("get", `/schedules/pages/${pid}?uid=${uid}`);
@@ -61,32 +61,32 @@ export const fetchSchedulesByPage = async (uid, pid) => {
 };
 
 
-/** 🔥 [3] 일정 추가 */
+/* [3] 일정 추가 */
 export const addSchedule = async (scheduleData) => {
     return await apiRequest("post", "/schedules", scheduleData);
 };
 
-/** 🔥 [4] 일정 상세 조회 (모달) */
+/* [4] 일정 상세 조회 (모달) */
 export const fetchScheduleDetails = async (sid) => {
     if (!sid) return null;
     return await apiRequest("get", `/schedules/${sid}`);
 };
 
-/** 🔥 [5] 일정 수정 */
+/* [5] 일정 수정 */
 export const updateSchedule = async (updatedSchedule) => {
     return await apiRequest("put", `/schedules/${updatedSchedule.sid}`, updatedSchedule);
 };
 
-/** 🔥 [6] 일정 삭제 */
+/* [6] 일정 삭제 */
 export const deleteSchedule = async (sid) => {
     return await apiRequest("delete", `/schedules/${sid}`);
 };
 
-/** 🔥 [7] 일정 드래그로 날짜 변경 */
+/* [7] 일정 드래그로 날짜 변경 */
 export const updateScheduleDrag = async (sid, start_date, end_date) => {
-    if (!sid) throw new Error("❌ 일정 ID(sid)가 없습니다.");
-    console.log("📡 API 요청 실행: PATCH /schedules/" + sid);
-    console.log("➡️ 요청 데이터:", { start_date, end_date });
+    if (!sid) throw new Error("일정 ID(sid)가 없습니다.");
+    console.log("API 요청 실행: PATCH /schedules/" + sid);
+    console.log("요청 데이터:", { start_date, end_date });
    
     return await apiRequest("patch", `/schedules/${sid}`, { start_date, end_date });
 };
@@ -95,13 +95,13 @@ export const updateScheduleDrag = async (sid, start_date, end_date) => {
 
 
 
-/** 🔥 [4] 특정 스케줄 페이지 정보 가져오기  이거 고민좀 */
+/* [4] 특정 스케줄 페이지 정보 가져오기  이거 고민좀 */
 export const fetchSchedulePageDetails = async (pid) => {
     if (!pid) return null;
     return await apiRequest("get", `/schedules/pages/${pid}`);
 };
 
-/** 🔥 [5] 새 페이지 추가 */
+/* [5] 새 페이지 추가 */
 // export const addPage = async (uid, title, loadPages) => {
 //     if (!uid || !title.trim()) return null;
 //     const result = await apiRequest("post", `/pages`, { uid, title: title.trim() });
@@ -125,13 +125,13 @@ export const addPage = async (uid, title) => {
     }
 };
 
-/** 🔥 [6] 새 스케줄 페이지 추가 */
+/* [6] 새 스케줄 페이지 추가 */
 // export const addSchedulePage = async (uid, title) => {
 //     if (!uid || !title.trim()) return null;
 //     return await apiRequest("post", `/schedules/pages`, { uid, title: title.trim() });
 // };
 
-/** 🔥 [7] 페이지 이름 변경 */
+/* [7] 페이지 이름 변경 */
 export const renamePage = async (pid, newTitle, loadPages) => {
     if (!pid || !newTitle.trim()) return false;
     const result = await apiRequest("put", `/pages/rename`, { pid, newTitle: newTitle.trim() });
@@ -143,7 +143,7 @@ export const renamePage = async (pid, newTitle, loadPages) => {
     return result;
 };
 
-/** 🔥 [8] 페이지 복제 */
+/* [8] 페이지 복제 */
 export const duplicatePage = async (uid, pid) => { 
     if (!uid || !pid) return null;
 
@@ -151,7 +151,7 @@ export const duplicatePage = async (uid, pid) => {
         const result = await apiRequest("post", `/pages/duplicate`, { uid, originalPid: pid });
 
         if (result) {
-            console.log("📢 페이지 복제됨! 목록 다시 불러옴");
+            console.log("페이지 복제됨! 목록 다시 불러옴");
             window.dispatchEvent(new Event("pageDuplicated"));
         }
 
@@ -163,7 +163,7 @@ export const duplicatePage = async (uid, pid) => {
 };
 
 
-/** 🔥 [9] 페이지 삭제 (휴지통 이동) */
+/* [9] 페이지 삭제 (휴지통 이동) */
 export const moveToTrash = async (pid) => {
     if (!pid) return false;
 
@@ -175,13 +175,13 @@ export const moveToTrash = async (pid) => {
     return result;
 };
 
-/** 🔥 [10] 휴지통에서 페이지 복원 */
+/* [10] 휴지통에서 페이지 복원 */
 export const restorePage = async (pid) => {
     if (!pid) return false;
     
     const result = await apiRequest("patch", `/pages/restore`, { pid });
     if (result) {
-        console.log("📢 페이지 복원 완료! 목록 다시 불러옴");
+        console.log("페이지 복원 완료! 목록 다시 불러옴");
         await fetchTrashPages(localStorage.getItem("uid"));
         window.dispatchEvent(new Event("pageRestored")); 
         window.dispatchEvent(new Event("trashUpdated")); 
@@ -189,7 +189,7 @@ export const restorePage = async (pid) => {
     return result;
 };
 
-/** 🔥 [11] 페이지 완전 삭제 */
+/* [11] 페이지 완전 삭제 */
 export const deletePagePermanently = async (pid) => {
     if (!pid) return false;
     const result = await apiRequest("delete", `/pages/${pid}`);
@@ -201,7 +201,7 @@ export const deletePagePermanently = async (pid) => {
     return result;
 };
 
-/** 🔥 [12] 휴지통 목록 조회 */
+/* [12] 휴지통 목록 조회 */
 export const fetchTrashPages = async (uid) => {
     if (!uid) return [];
 
@@ -214,7 +214,7 @@ export const fetchTrashPages = async (uid) => {
     } catch (error) {
         console.error(`❌ 휴지통 API 요청 실패 (GET /pages/trash?uid=${uid})`, error);
 
-        // ✅ 404 (Not Found)일 경우 빈 배열 반환
+        // 404 (Not Found)일 경우 빈 배열 반환
         if (error.response?.status === 404) {
             console.warn("⚠️ [휴지통 조회] 404: 데이터 없음 (빈 배열 반환)");
             return [];
@@ -226,12 +226,12 @@ export const fetchTrashPages = async (uid) => {
 
 
 
-/** 🔥 [13] 30일 이상 지난 페이지 자동 삭제 */
+/* [13] 30일 이상 지난 페이지 자동 삭제 */
 export const autoDeleteTrashPages = async () => {
     return await apiRequest("delete", `/pages/trash/auto-delete`);
 };
 
-/** 🔥 [14] 사이드바 즐겨찾기 추가/해제 */
+/* [14] 사이드바 즐겨찾기 추가/해제 */
 export const switchFavorite =  async (pid, isFavorite) => {
     if (!pid) return false;
     const result = await apiRequest("patch", `/pages/favorite`, { pid, isFavorite });
@@ -243,7 +243,7 @@ export const switchFavorite =  async (pid, isFavorite) => {
 };
 
 
-/** 🔥 [14] 콜아웃 조회 */
+/* [14] 콜아웃 조회 */
 export const fetchCallout = async(uid, pid = null) => {
     if (!uid) return null;
 
@@ -254,7 +254,7 @@ export const fetchCallout = async(uid, pid = null) => {
     return await apiRequest("get", endpoint);
 };
 
-/** 🔥 [15] 콜아웃 추가 또는 수정 */
+/* [15] 콜아웃 추가 또는 수정 */
 export const saveCallout = async(uid, pid, callout) => {
     if (!uid) return false;
 
@@ -271,7 +271,7 @@ export const saveCallout = async(uid, pid, callout) => {
     return result;
 };
 
-/** 🔥 [16] 드래그앤드롭으로 페이지 목록 순서 이동 */
+/* [16] 드래그앤드롭으로 페이지 목록 순서 이동 */
 export const updatePageOrder = async (pagesOrder) => {
     try {
         const response = await apiRequest("PUT", "/pages/order", { pages: pagesOrder });
@@ -301,10 +301,6 @@ async function handleReindexResult(res) {
 // ===================================
 const safeParse = (s) => { try { return JSON.parse(s) } catch { return {} } };
 /* [1]  블록 목록 조회 - 전체 */
-// export const fetchBlocks = async () => {
-//     const response = await apiRequest("get", `/block`);
-//     return (response ?? []).sort((a, b) => a.order_index - b.order_index);
-// };
 export const fetchBlocks = async () => {
   const response = await apiRequest("get", `/block`);
   const list = Array.isArray(response) ? response : (response?.blocks ?? []);
@@ -323,33 +319,32 @@ export const fetchBlockById = async (bid) => {
 
 
 /* [2] 블록 추가(1000단위 간격 적용) */
-export const addBlock = async (type = "text", content = "", order_index,checked) => {
+export const addBlock = async (
+    type = "text",
+    content = "",
+    order_index,
+    checked,
+    parent_bid = null,
+    depth = 0,
+    meta = null
+) => {
     try {
-        const response = await apiRequest("post", "/block", {type, content, order_index, checked, });
+        const response = await apiRequest("post", "/block", {
+        type,
+        content,
+        order_index,
+        checked,
+        parent_bid,
+        depth,
+        meta,
+        });
         return handleReindexResult(response);
     } catch (err) {
         console.error("[page service] addBlock 에러: ", err);
+        console.log("[PageService] addBlock payload:", { type, meta });
         return null;
     }
 };
-
-// export const addBlock = async (type = "text", content = "", order_index) => {
-//     try {
-//       const response = await apiRequest("post", "/block", { type, content, order_index });
-  
-//       // 리인덱싱 발생 시 전체 블록 재로드
-//       if (response?.reindexed) {
-//         console.log("⚠️ 리인덱싱 발생 → 전체 블록 재로드");
-//         const blocks = await fetchBlocks();
-//         return { ...response, reloadedBlocks: blocks };
-//       }
-  
-//       return response;
-//     } catch (err) {
-//       console.error("❌ addBlock 에러", err);
-//       return null;
-//     }
-// };
 
 
 /* [3]  블록 리인덱싱 : 순서 재정렬 */
@@ -362,16 +357,6 @@ export const reindexBlocks = async () => {
   }
   return response;
 };
-// export const reindexBlocks = async () => {
-//     try {
-//       const response = await apiRequest("post", `/block/reindex`);
-//       console.log("✅ 블록 리인덱싱 완료:", response);
-//       return response;
-//     } catch (err) {
-//       console.error("❌ 블록 리인덱싱 실패:", err);
-//       return null;
-//     }
-// };
 
 /* [4]  블록 내용 수정 */
 export const updateBlockContent = async (bid, content ) => {
@@ -390,7 +375,21 @@ export const updateBlockContent = async (bid, content ) => {
 export const updateBlockType = async (bid, type) => {
     try {
         const response = await apiRequest("put", `/block/type`, { bid, type });
-        return response.data;
+         const block = response?.data ?? null;
+        if (!block) return null;
+
+        // meta가 문자열인 경우 파싱
+        if (typeof block.meta === "string") {
+            try { 
+                block.meta = JSON.parse(block.meta); 
+            } catch { 
+                block.meta = {}; 
+            }
+        } else {
+            block.meta = block.meta || {};
+        }
+        return block;
+        // return response.data;
     } catch (error) {
       console.error("블록 타입 업데이트 실패", error);
       throw error;
@@ -436,7 +435,7 @@ export const reorderBlock =async (bid, prevBid, nextBid) => {
     }
 };
 
-/** [10] 배치 재정렬 */
+/* [10] 배치 재정렬 */
 export const reorderBlocksBatch = async (orderedBids) => {
     const items = orderedBids.map((bid) => ({ bid }));
     const response = await apiRequest("post", "/block/reorder/batch", { items });
@@ -445,7 +444,7 @@ export const reorderBlocksBatch = async (orderedBids) => {
 };
 
 
-/** [11] 콜아웃 */
+/* [11] 콜아웃 */
 export const updateCallout = async (bid, patch /* {mode?, color?, iconId?} */) => {
   const res = await apiRequest("patch", `/block/callout/${bid}`, patch);
   const block = res?.block ?? res ?? null;
@@ -453,43 +452,31 @@ export const updateCallout = async (bid, patch /* {mode?, color?, iconId?} */) =
   return block;
 };
 
-// export const updateCallout = async (bid, patch) => {
-//   try {
-//     const res = await apiRequest("patch", `/block/callout/${bid}`, patch);
-//     const block = res?.block ?? res ?? null;
-//     if (block && typeof block.meta === "string") block.meta = safeParse(block.meta);
-//     return block;
-//   } catch (e) {
-//     // 구(旧) PUT 엔드포인트가 남아있는 환경 대비
-//     const res2 = await apiRequest("put", `/block/callout`, { bid, ...patch });
-//     const block = res2?.block ?? res2 ?? null;
-//     if (block && typeof block.meta === "string") block.meta = safeParse(block.meta);
-//     return block;
-//   }
-// };
+
+/* [12] 토글 접힘 상태 변경 */
+export const updateToggleCollapsed = async (bid, collapsed) => {
+  try {
+    const res = await apiRequest("patch", `/block/toggle/${bid}`, {
+      collapsed: !!collapsed, 
+    });
+
+    const block = res?.block ?? null;
+    if (!block) return null;
+
+    if (typeof block.meta === "string") {
+      try {
+        block.meta = JSON.parse(block.meta);
+      } catch {
+        block.meta = {};
+      }
+    } else {
+      block.meta = block.meta || {};
+    }
+    return block;
+  } catch (err) {
+    console.error("[PageService] updateToggleCollapsed 실패:", err);
+    return null;
+  }
+};
 
 
-
-
-
-
-/*
-1. 할 일 블록 생성
-/할 일, /todo 명령어로 할 일(To-do) 블록 생성
-
-2. 키보드 인터랙션
-Enter: 다음 할 일 항목 자동 생성
-Enter 2번 : 할일목록 종료되면서 다른 블록으로 이동(다음 줄 생성(현재 블록 뒤에 새로운 블록 생성))
-Backspace: 비어있는 항목 제거
-
-3. 드래그로 순서 변경
-마우스로 항목 드래그해 순서 재배치 가능
-
-4. 할 일 완료 표시
-체크 시 취소선으로 표시되어 직관적으로 완료 상태 확인 가능
-
-각 "할 일"은 블록 단위로 저장되며, 서브 체크 항목은 계층적 구조를 가짐
-완료 여부는 내부적으로 checked: true | false 형태로 저장됨
-실시간으로 변경 내용이 저장되어 협업 환경에서도 동기화됨
-
-*/
